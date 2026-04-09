@@ -27,23 +27,6 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173)
 
-## Deploy to Vercel
-
-### Option A — Vercel CLI
-```bash
-npm install -g vercel
-vercel
-```
-
-### Option B — GitHub + Vercel Dashboard
-1. Push this repo to GitHub
-2. Go to [vercel.com](https://vercel.com) → New Project
-3. Import your GitHub repo
-4. Framework: **Vite** (auto-detected)
-5. Click **Deploy** — done!
-
-No environment variables needed.
-
 ## Project Structure
 
 ```
