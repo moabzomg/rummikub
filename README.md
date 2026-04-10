@@ -1,51 +1,22 @@
-# 🎲 Rummikub
+# Rummikub — AI Strategy Game
 
-A fully playable Rummikub game built with React + Vite. Supports 1–4 players with an AI opponent option.
+A full-featured Rummikub game with multiple AI strategies and human multiplayer support.
 
 ## Features
+- 2–4 players, mix of human and AI
+- 4 AI strategies: Aggressive, Defensive, Balanced, Speed
+- Full rule enforcement: valid sets, initial meld ≥30, board rearrangement
+- 106-tile pool with jokers
 
-- 🤖 **AI opponent** with strategic play (groups, runs, initial meld detection)
-- 👥 **2–4 player local multiplayer**
-- ✅ **Full rule enforcement** — valid sets, initial meld ≥ 30 pts, jokers
-- 🎨 **Dark, polished UI** with tile animations
-- 📱 **Responsive** layout
-
-## Rules Summary
-
-- **Runs**: 3+ tiles of the same color in consecutive order
-- **Groups**: 3–4 tiles of the same number in different colors
-- **Initial meld**: Your first play must total ≥ 30 points
-- **Jokers**: Wild tiles worth 30 points
-- **Win**: First player to empty their hand wins
-
-## Getting Started
-
+## Quick Start
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
-
-## Project Structure
-
+## Deploy to Vercel
+```bash
+git init && git add . && git commit -m "Rummikub"
+gh repo create rummikub --public --push
+# Then import on vercel.com
 ```
-src/
-├── game/
-│   ├── logic.js          # Tile factory, set validation, AI logic
-│   └── useGameState.js   # All game state via React hooks
-├── components/
-│   ├── Tile.jsx           # Individual tile rendering
-│   ├── Board.jsx          # Table / played sets
-│   ├── PlayerHand.jsx     # Player's rack of tiles
-│   ├── MenuScreen.jsx     # Game mode & name setup
-│   ├── GameScreen.jsx     # Main game UI
-│   └── GameOverScreen.jsx # Winner + scores
-└── App.jsx               # Router / screen manager
-```
-
-## Tech Stack
-
-- **React 18** + **Vite 5**
-- Zero external UI libraries — pure CSS-in-JS
-- Google Fonts (Playfair Display + DM Mono)
