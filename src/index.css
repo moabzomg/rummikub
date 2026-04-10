@@ -257,3 +257,84 @@ html,body,#root{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg
 .strat-d{font-size:.62rem;color:var(--ink3);line-height:1.4}
 
 @media(max-width:800px){.main{grid-template-columns:1fr}.sidebar{flex-direction:row;flex-wrap:wrap}.panel{flex:1;min-width:120px}}
+
+/* ─── Simulation dashboard ─────────────────────────────────────────────── */
+.sim-dashboard{min-height:100vh;padding:24px;max-width:800px;margin:0 auto;font-family:'DM Sans',sans-serif}
+.sim-header{text-align:center;margin-bottom:24px;padding:24px;background:var(--cream);border:1px solid var(--border2);border-radius:var(--r)}
+.sim-title{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;margin-bottom:6px}
+.sim-winner{font-size:1.2rem;color:var(--gold);font-weight:700;margin-bottom:4px}
+.sim-sub{font-size:.75rem;color:var(--ink3)}
+.sim-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:600px){.sim-grid{grid-template-columns:1fr 1fr}}
+
+.chart-block{background:var(--cream);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.chart-title{font-size:.65rem;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:10px}
+.bar-chart{display:flex;gap:8px;align-items:flex-end;height:90px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.bar-val{font-size:.58rem;font-weight:700;color:var(--ink2);white-space:nowrap}
+.bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end;background:var(--bg2);border-radius:3px;overflow:hidden;min-height:4px}
+.bar{width:100%;border-radius:3px 3px 0 0;min-height:4px;transition:height .4s ease}
+.bar-lbl{font-size:.52rem;color:var(--ink3);text-align:center;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sim-sparkline{background:var(--cream);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:16px;overflow-x:auto}
+.sim-table-wrap{margin-bottom:16px;overflow-x:auto}
+.sim-table{width:100%;border-collapse:collapse;font-size:.72rem}
+.sim-table th{padding:8px 12px;background:var(--bg2);border-bottom:2px solid var(--border2);text-align:left;font-weight:600;color:var(--ink3);letter-spacing:.05em;font-size:.62rem;text-transform:uppercase}
+.sim-table td{padding:8px 12px;border-bottom:1px solid var(--border)}
+.winner-row td{background:rgba(30,122,58,.06);font-weight:600}
+.sim-log-wrap{margin-bottom:16px}
+.sim-log-toggle{font-size:.72rem;color:var(--ink3);cursor:pointer;padding:6px;font-family:'DM Sans',sans-serif}
+.sim-log{max-height:200px;overflow-y:auto;background:var(--bg2);border-radius:6px;padding:8px;font-size:.62rem;color:var(--ink2);margin-top:4px}
+.sim-log-e{padding:2px 0;border-bottom:1px solid var(--border)}
+.sim-actions{display:flex;gap:8px;justify-content:center}
+
+/* ─── AI turn blocker ──────────────────────────────────────────────────── */
+.ai-turn-screen{position:fixed;inset:0;background:rgba(250,247,242,.96);display:flex;align-items:center;justify-content:center;z-index:150;backdrop-filter:blur(3px)}
+.ai-turn-card{text-align:center;padding:40px 60px;background:var(--cream);border:2px solid var(--border2);border-radius:16px;box-shadow:0 8px 32px var(--shadow)}
+.ai-turn-icon{font-size:3rem;margin-bottom:12px}
+.ai-turn-name{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;margin-bottom:4px}
+.ai-turn-sub{font-size:.8rem;color:var(--ink3);margin-bottom:16px}
+.ai-turn-thinking{display:flex;gap:8px;justify-content:center;margin-bottom:16px}
+.dot{width:10px;height:10px;background:var(--gold);border-radius:50%;animation:dotbounce 1.2s infinite}
+.dot:nth-child(2){animation-delay:.15s}.dot:nth-child(3){animation-delay:.3s}
+@keyframes dotbounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-8px)}}
+.ai-turn-hint{font-size:.72rem;color:var(--ink3);font-style:italic}
+
+/* ─── Hint panel ───────────────────────────────────────────────────────── */
+.hint-panel{background:var(--cream);border:1px solid var(--border2);border-radius:var(--r);padding:10px;margin-top:6px}
+.hint-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:.68rem;font-weight:600;color:var(--ink2)}
+.hint-toggle{background:none;border:1px solid var(--border2);border-radius:4px;cursor:pointer;padding:2px 7px;font-size:.65rem;color:var(--ink3)}
+.hint-body{display:flex;flex-direction:column;gap:6px}
+.hint-empty{font-size:.65rem;color:var(--ink3);font-style:italic;padding:4px}
+.hint-item{padding:7px 9px;border-radius:6px;border-left:3px solid transparent;background:var(--bg2)}
+.hint-item.play{border-left-color:var(--green)}
+.hint-item.extend{border-left-color:var(--blue)}
+.hint-item.rearrange,.hint-item.smart{border-left-color:var(--gold);background:rgba(197,147,58,.06)}
+.hint-item.draw{border-left-color:var(--ink3)}
+.hint-item.stuck{border-left-color:rgba(220,80,60,.6);background:rgba(220,80,60,.04)}
+.hint-item.initial{border-left-color:var(--gold)}
+.hint-item-hdr{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:.7rem}
+.hint-ico{font-size:.85rem}
+.hint-desc{font-size:.64rem;color:var(--ink3);line-height:1.45;margin-bottom:4px}
+.hint-sets{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.hint-set{display:flex;align-items:center;gap:2px;padding:3px 6px;background:rgba(30,122,58,.1);border:1px solid rgba(30,122,58,.25);border-radius:5px;cursor:pointer;transition:all .15s}
+.hint-set:hover{background:rgba(30,122,58,.2);transform:translateY(-2px)}
+.hint-set-val{font-size:.6rem;color:var(--green);font-weight:600;margin-left:4px;white-space:nowrap}
+
+/* ─── Multiplayer panel ─────────────────────────────────────────────────── */
+.mp-panel{background:var(--cream);border:1px solid var(--border2);border-radius:var(--r);padding:12px;margin-bottom:6px}
+.mp-title{font-size:.75rem;font-weight:700;color:var(--ink);margin-bottom:4px}
+.mp-sub{font-size:.62rem;color:var(--ink3);margin-bottom:10px}
+.mp-player-row{padding:7px;background:var(--bg2);border-radius:6px;margin-bottom:6px;border:1px solid var(--border)}
+.mp-player-row.cur{border-color:var(--gold);background:rgba(197,147,58,.06)}
+.mp-player-name{font-size:.68rem;font-weight:600;margin-bottom:4px;color:var(--ink2)}
+.mp-url-row{display:flex;gap:6px}
+.mp-url{flex:1;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;font-size:.62rem;font-family:'DM Mono',monospace;background:var(--cream);color:var(--ink);cursor:pointer}
+.mp-note{font-size:.58rem;color:var(--ink3);font-style:italic;margin-top:6px}
+
+/* ─── Sim option in setup ───────────────────────────────────────────────── */
+.sim-option{background:rgba(197,147,58,.06);border:1px solid rgba(197,147,58,.2);border-radius:var(--r);padding:12px}
+.sim-toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.sim-check{display:flex;align-items:center;gap:8px;font-size:.72rem;color:var(--ink2);cursor:pointer}
+.sim-check input{cursor:pointer;width:16px;height:16px}
+.sim-runs-row{display:flex;align-items:center;gap:6px;font-size:.72rem}
