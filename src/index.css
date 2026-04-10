@@ -338,3 +338,169 @@ html,body,#root{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg
 .sim-check{display:flex;align-items:center;gap:8px;font-size:.72rem;color:var(--ink2);cursor:pointer}
 .sim-check input{cursor:pointer;width:16px;height:16px}
 .sim-runs-row{display:flex;align-items:center;gap:6px;font-size:.72rem}
+
+/* ─── Drag & drop ─────────────────────────────────────────────────────── */
+
+/* Tile wrapper — contains the tile + indicator badges */
+.tile-wrapper {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Drag ghost: tile being dragged looks faded */
+.tile.ghost {
+  opacity: 0.35;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Dimmed: tile has no valid drop target when dragging something */
+.tile.dimmed {
+  opacity: 0.45;
+  filter: grayscale(0.5);
+}
+
+/* Drop highlight on tile (shows target zone) */
+.tile.drop-hi {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 3px rgba(197,147,58,.45) !important;
+  transform: scale(1.06) !important;
+}
+
+/* Drop label inside tile */
+.drop-label {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .5rem;
+  white-space: nowrap;
+  background: var(--gold);
+  color: white;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Indicator badges on hand tiles */
+.tile-can-drop {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  background: var(--green);
+  color: white;
+  font-size: .48rem;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 1px 4px;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+.tile-no-drop {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  background: var(--ink3);
+  color: rgba(255,255,255,.6);
+  font-size: .48rem;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 1px 5px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Board drag state */
+.board.drag-active {
+  border-style: dashed;
+  border-color: rgba(197,147,58,.5);
+}
+
+/* Board set — highlighted as drop target */
+.bset.drop-target {
+  border-color: var(--gold) !important;
+  background: rgba(197,147,58,.12) !important;
+  box-shadow: 0 0 0 2px rgba(197,147,58,.4);
+  transform: scale(1.02);
+  transition: all .15s;
+}
+.bset-drop-hint {
+  display: flex;
+  gap: 4px;
+  position: absolute;
+  top: -10px;
+  left: 0;
+  z-index: 10;
+}
+.bset-drop-tag {
+  font-size: .5rem;
+  background: var(--gold);
+  color: white;
+  border-radius: 6px;
+  padding: 1px 5px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+
+/* New set drop zone */
+.new-set-drop {
+  width: 50px;
+  min-height: 58px;
+  border: 2px dashed rgba(197,147,58,.3);
+  border-radius: var(--r);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .55rem;
+  color: rgba(197,147,58,.5);
+  transition: all .15s;
+  cursor: copy;
+}
+.new-set-drop.active {
+  border-color: var(--gold);
+  background: rgba(197,147,58,.1);
+  color: var(--gold);
+  width: 90px;
+  font-weight: 600;
+}
+
+/* Drag status bar */
+.drag-status {
+  font-size: .65rem;
+  color: var(--ink3);
+  margin-left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Drag hints in hint panel */
+.drag-hint-row {
+  font-size: .63rem;
+  color: var(--ink2);
+  padding: 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+.drag-hint-row:last-child { border: none; }
+
+/* Existing bset needs relative for absolute children */
+.bset { position: relative; }
+
+/* ─── Hint panel additions ──────────────────────────────────────────────── */
+.hint-item.extend  { border-left-color: var(--blue); }
+.hint-item.rearrange, .hint-item.smart { border-left-color: var(--gold); }
+
+/* ─── Sim dashboard extras ──────────────────────────────────────────────── */
+.sim-dashboard { background: var(--bg); }
+
+/* ─── Responsive tweaks ─────────────────────────────────────────────────── */
+@media (max-width:700px) {
+  :root { --tile-w:36px; --tile-h:50px; }
+  .tile .t-num { font-size: .9rem; }
+  .tile.in-board { width:30px; height:42px; }
+}
