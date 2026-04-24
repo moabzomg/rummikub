@@ -1,14 +1,1630 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rummikub</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rummikub</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+  --bg:#1a1a2e; --felt:#0d5c3d; --felt2:#0a4d32;
+  --gold:#f4c430; --gold2:#c49800;
+  --red:#e03030; --blue:#1a6fe8; --orange:#e87a1a; --black:#111;
+  --tile:#fefcf6; --tile-sh:0 3px 8px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.3);
+  --tw:42px; --th:54px;
+  --r:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:#f0ede8;user-select:none}
+
+/* ── SETUP ── */
+#setup{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;
+  padding:32px 16px;background:radial-gradient(ellipse 120% 80% at 50% 0%,#1e3a5f,var(--bg))}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:68px;letter-spacing:5px;
+  background:linear-gradient(135deg,#f4c430,#ffd96b,#c49800);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.logo-sub{font-size:11px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:40px}
+.setup-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;
+  padding:28px;width:100%;max-width:500px;backdrop-filter:blur(12px)}
+.setup-card h3{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+.player-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.player-row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border-radius:8px;padding:9px 12px}
+.p-num{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gold);width:20px;flex-shrink:0}
+.p-name{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:5px;
+  padding:5px 9px;color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
+.p-name:focus{border-color:var(--gold)}
+.type-btns{display:flex;gap:3px}
+.tbtn{padding:4px 11px;border-radius:4px;border:1px solid rgba(255,255,255,.14);background:transparent;
+  color:rgba(255,255,255,.45);font-size:11px;cursor:pointer;transition:.12s}
+.tbtn.on{background:var(--gold);border-color:var(--gold);color:#000;font-weight:600}
+.add-p{background:transparent;border:1px dashed rgba(255,255,255,.18);border-radius:8px;
+  color:rgba(255,255,255,.35);padding:9px;cursor:pointer;font-size:12px;width:100%;transition:.2s}
+.add-p:hover{border-color:var(--gold);color:var(--gold)}
+.start-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  border:none;border-radius:9px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;
+  color:#000;cursor:pointer;margin-top:20px;box-shadow:0 4px 18px rgba(244,196,48,.3);transition:.2s}
+.start-btn:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(244,196,48,.45)}
+
+/* ── GAME ── */
+#game{display:none;flex-direction:column;height:100vh}
+
+/* Header */
+.g-header{display:flex;align-items:center;gap:8px;padding:6px 14px;
+  background:rgba(0,0,0,.45);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;height:46px}
+.g-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);letter-spacing:2px;margin-right:4px}
+.ptab{padding:3px 11px;border-radius:5px;font-size:11px;font-weight:500;
+  background:rgba(255,255,255,.06);border:1px solid transparent;transition:.15s;white-space:nowrap}
+.ptab.cur{background:rgba(244,196,48,.14);border-color:var(--gold);color:var(--gold)}
+.ptab.last-turn{border-color:#e03030 !important;animation:lastPulse 1s ease-in-out infinite}
+@keyframes lastPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,48,48,.4)}50%{box-shadow:0 0 0 4px rgba(224,48,48,0)}}
+.ptab .tc{font-size:9px;opacity:.55;margin-left:3px}
+.pool-info{font-size:11px;color:rgba(255,255,255,.4);margin-left:auto}
+.debug-toggle{font-size:10px;padding:3px 8px;border:1px solid rgba(255,165,0,.4);border-radius:4px;
+  background:transparent;color:rgba(255,165,0,.7);cursor:pointer;flex-shrink:0}
+
+/* Board */
+.board-area{flex:1;background:var(--felt);overflow:auto;padding:10px;position:relative;min-height:0;
+  background-image:radial-gradient(circle at 15% 15%,rgba(255,255,255,.025),transparent 55%),
+    radial-gradient(circle at 85% 85%,rgba(0,0,0,.08),transparent 55%)}
+.board-sets{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;min-height:100%;padding-bottom:8px}
+
+.bset{display:flex;flex-direction:row;gap:2px;padding:7px 9px;
+  background:rgba(0,0,0,.22);border:2px solid rgba(255,255,255,.07);border-radius:var(--r);
+  position:relative;align-items:center;min-width:56px;min-height:68px;transition:border-color .13s,background .13s;
+  cursor:default}
+.bset.drop-target{border-color:var(--gold);background:rgba(244,196,48,.07);box-shadow:0 0 0 2px rgba(244,196,48,.25)}
+.bset.invalid{border-color:var(--red);background:rgba(224,48,48,.07)}
+.bset.ai-new{border-color:#22c87a;background:rgba(34,200,122,.07);animation:aiGlow .6s ease-out}
+@keyframes aiGlow{0%{box-shadow:0 0 0 4px rgba(34,200,122,.5)}100%{box-shadow:none}}
+.bset-lbl{position:absolute;top:-8px;left:7px;font-size:8px;letter-spacing:1px;text-transform:uppercase;
+  color:rgba(255,255,255,.28);background:var(--felt);padding:0 3px}
+
+/* Drop insert line */
+.bset .drop-insert{width:3px;min-height:var(--th);background:var(--gold);border-radius:2px;
+  opacity:0;transition:opacity .12s;flex-shrink:0}
+.bset .drop-insert.vis{opacity:1}
+
+.new-set-zone{display:flex;align-items:center;justify-content:center;padding:7px 14px;
+  background:rgba(255,255,255,.02);border:2px dashed rgba(255,255,255,.12);border-radius:var(--r);
+  color:rgba(255,255,255,.22);font-size:11px;min-width:70px;min-height:68px;cursor:pointer;transition:.13s}
+.new-set-zone:hover,.new-set-zone.drag-over{border-color:var(--gold);color:var(--gold);background:rgba(244,196,48,.04)}
+
+/* Tiles */
+.tile{width:var(--tw);height:var(--th);background:var(--tile);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  box-shadow:var(--tile-sh);font-weight:700;font-size:17px;line-height:1;cursor:grab;
+  position:relative;transition:transform .13s,box-shadow .13s,opacity .2s;flex-shrink:0;
+  border:1.5px solid rgba(0,0,0,.13)}
+.tile:active{cursor:grabbing}
+.tile.c-red{color:var(--red)}
+.tile.c-blue{color:var(--blue)}
+.tile.c-orange{color:var(--orange)}
+.tile.c-black{color:var(--black)}
+.tile.c-joker{background:linear-gradient(135deg,#1a1a2e,#2e1a60);color:var(--gold);border-color:rgba(244,196,48,.5)}
+
+.tile.in-board{width:38px;height:50px;font-size:15px}
+.tile.in-board.c-joker{font-size:14px}
+
+.tile.selected{transform:translateY(-10px);box-shadow:0 10px 20px rgba(244,196,48,.45),var(--tile-sh);
+  border-color:var(--gold);z-index:10}
+.tile.dragging{opacity:.3;pointer-events:none}
+.tile.ghost-drag{opacity:.85;pointer-events:none;position:fixed;z-index:9999;
+  box-shadow:0 10px 30px rgba(0,0,0,.6);transition:none}
+
+@keyframes placeBounce{0%{transform:scale(1.25) translateY(-6px)}60%{transform:scale(.93) translateY(2px)}100%{transform:scale(1)}}
+.tile.bounce{animation:placeBounce .28s ease-out}
+
+@keyframes aiDrop{0%{transform:scale(1.3) translateY(-16px);opacity:0}
+  55%{transform:scale(.92) translateY(3px);opacity:1}100%{transform:scale(1) translateY(0);opacity:1}}
+.tile.ai-drop{animation:aiDrop .32s ease-out forwards}
+
+/* Long-press lasso animation */
+@keyframes lassoSelect{0%{transform:scale(1)}50%{transform:scale(1.08) translateY(-4px)}100%{transform:scale(1.04) translateY(-8px)}}
+.tile.lasso{animation:lassoSelect .18s ease-out forwards;border-color:var(--gold)}
+
+.tile .t-num{font-size:inherit;line-height:1}
+.tile .t-color{font-size:7px;text-transform:uppercase;letter-spacing:.5px;opacity:.55;margin-top:1px}
+
+/* Bottom panel */
+.bottom{flex-shrink:0;background:rgba(0,0,0,.52);border-top:1px solid rgba(255,255,255,.07);padding:9px 12px}
+
+.action-bar{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.turn-info{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;color:var(--gold);margin-right:auto}
+
+/* Sort controls */
+.sort-ctrl{display:flex;gap:3px;background:rgba(255,255,255,.06);border-radius:5px;padding:2px}
+.sort-btn{padding:3px 8px;border-radius:4px;border:none;background:transparent;
+  color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;transition:.12s;white-space:nowrap}
+.sort-btn.on{background:rgba(255,255,255,.15);color:#fff}
+
+.btn{padding:6px 14px;border-radius:5px;border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.07);color:#fff;font-size:12px;font-family:'DM Sans',sans-serif;
+  cursor:pointer;transition:.13s;white-space:nowrap}
+.btn:hover:not(:disabled){background:rgba(255,255,255,.14)}
+.btn:disabled{opacity:.32;cursor:not-allowed}
+.btn-green{background:#165c38;border-color:#1f8a52;font-weight:600}
+.btn-green:hover:not(:disabled){background:#1f8a52}
+.btn-red{background:rgba(224,48,48,.17);border-color:rgba(224,48,48,.45);color:#f07070}
+.btn-red:hover:not(:disabled){background:rgba(224,48,48,.3)}
+.btn-gold{background:rgba(244,196,48,.12);border-color:rgba(244,196,48,.45);color:var(--gold)}
+.btn-gold:hover:not(:disabled){background:rgba(244,196,48,.22)}
+
+/* Hand */
+.hand-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:5px}
+.sugg-strip{display:flex;gap:5px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+.sugg-strip::-webkit-scrollbar{display:none}
+.sugg-set{display:flex;gap:2px;padding:4px 7px;background:rgba(34,163,98,.1);border:1px solid rgba(34,163,98,.28);
+  border-radius:5px;cursor:pointer;flex-shrink:0;transition:.13s;align-items:center}
+.sugg-set:hover{background:rgba(34,163,98,.2);border-color:rgba(34,163,98,.5)}
+.sugg-set.dimmed{opacity:.38;cursor:default}
+
+.hand-rack{display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end;min-height:60px;
+  padding:5px 7px;background:rgba(120,85,20,.25);border:1px solid rgba(120,85,20,.4);border-radius:7px}
+.hand-sep{width:1px;background:rgba(255,255,255,.18);align-self:stretch;margin:0 4px;flex-shrink:0}
+
+/* Mini tiles (hints/suggestions) */
+.mt{width:24px;height:30px;border-radius:3px;background:var(--tile);display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:700;border:1px solid rgba(0,0,0,.18)}
+.mt.c-red{color:var(--red)}.mt.c-blue{color:var(--blue)}.mt.c-orange{color:var(--orange)}
+.mt.c-black{color:var(--black)}.mt.c-joker{background:#2d1a60;color:var(--gold)}
+
+/* Hint panel */
+.hint-panel{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:rgba(8,15,28,.97);border-top:2px solid var(--gold);
+  padding:14px 18px;max-height:60vh;overflow-y:auto}
+.hint-panel.vis{display:block;animation:slideUp .2s ease-out}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.hint-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.hint-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--gold)}
+.hint-close{background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:18px}
+.hint-moves{display:flex;flex-direction:column;gap:7px}
+.hint-move{display:flex;align-items:center;gap:9px;padding:9px 12px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:7px;cursor:pointer;transition:.13s}
+.hint-move:hover{background:rgba(244,196,48,.09);border-color:rgba(244,196,48,.3)}
+.hint-move.best{border-color:rgba(244,196,48,.5);background:rgba(244,196,48,.07)}
+.hm-badge{font-size:8px;letter-spacing:1px;text-transform:uppercase;background:var(--gold);
+  color:#000;padding:2px 5px;border-radius:3px;font-weight:700;flex-shrink:0}
+.hm-badge.draw{background:rgba(255,255,255,.2);color:#fff}
+.hm-desc{font-size:12px;flex:1;line-height:1.4}
+.hm-tiles{display:flex;gap:2px;flex-wrap:wrap}
+.hm-pts{font-size:11px;color:var(--gold);font-weight:600;flex-shrink:0}
+
+/* AI overlay */
+.ai-overlay{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);
+  backdrop-filter:blur(3px);align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.ai-overlay.vis{display:flex}
+.ai-name{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--gold)}
+.ai-spin{width:36px;height:36px;border:3px solid rgba(244,196,48,.18);border-top-color:var(--gold);
+  border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+.toast{position:fixed;top:54px;left:50%;transform:translateX(-50%);background:rgba(224,48,48,.92);
+  color:#fff;padding:9px 18px;border-radius:7px;font-size:12px;z-index:400;display:none;
+  max-width:380px;text-align:center;backdrop-filter:blur(4px)}
+.toast.vis{display:block;animation:fadeIn .18s ease-out}
+.toast.info{background:rgba(26,111,232,.9)}
+.toast.ok{background:rgba(34,163,98,.9)}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* Win */
+.win-screen{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.88);
+  align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.win-screen.vis{display:flex}
+.win-title{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:4px;
+  background:linear-gradient(135deg,var(--gold),#fff,var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:wPulse 1.5s ease-in-out infinite}
+@keyframes wPulse{0%,100%{opacity:1}50%{opacity:.65}}
+.win-sub{font-size:16px;color:rgba(255,255,255,.65)}
+.score-tbl{background:rgba(255,255,255,.05);border-radius:9px;padding:14px 22px;min-width:260px}
+.score-row{display:flex;justify-content:space-between;padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.07);font-size:13px}
+.score-row:last-child{border-bottom:none}
+.sr-pos{color:var(--gold);width:22px}
+
+/* Debug panel */
+.debug-panel{display:none;position:fixed;bottom:0;right:0;z-index:600;width:340px;max-height:50vh;
+  background:rgba(10,10,20,.97);border:1px solid rgba(255,165,0,.5);border-radius:8px 0 0 0;
+  overflow-y:auto;padding:10px;font-size:11px;font-family:monospace}
+.debug-panel.vis{display:block}
+.debug-panel h4{color:orange;margin-bottom:6px;font-size:12px}
+.debug-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.debug-line.ok{color:#4caf50}
+.debug-line.err{color:#f44336}
+.debug-line.warn{color:#ff9800}
+
+/* Last turn banner */
+.last-turn-banner{display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  background:rgba(224,48,48,.85);color:#fff;padding:4px 14px;border-radius:20px;
+  font-size:11px;font-weight:600;letter-spacing:1px;z-index:50;backdrop-filter:blur(4px)}
+.last-turn-banner.vis{display:block}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup">
+  <div class="logo">Rummikub</div>
+  <div class="logo-sub">Tile Strategy Game</div>
+  <div class="setup-card">
+    <h3>Players</h3>
+    <div class="player-rows" id="player-rows"></div>
+    <button class="add-p" id="add-p-btn">+ Add Player (max 4)</button>
+    <button class="start-btn" id="start-btn">DEAL TILES</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game">
+  <div class="g-header">
+    <div class="g-logo">R</div>
+    <div id="ptabs" style="display:flex;gap:4px;flex:1;overflow:hidden"></div>
+    <div class="pool-info" id="pool-info"></div>
+    <button class="debug-toggle" id="debug-toggle">DEBUG</button>
+  </div>
+
+  <div class="board-area" id="board-area">
+    <div class="last-turn-banner" id="lt-banner">⚠ LAST TURN — Pool empty!</div>
+    <div class="board-sets" id="board-sets"></div>
+  </div>
+
+  <div class="bottom">
+    <div class="action-bar">
+      <div class="turn-info" id="turn-info">—</div>
+      <div class="sort-ctrl">
+        <button class="sort-btn" id="sort-color-btn" title="Sort by colour">🎨 Color</button>
+        <button class="sort-btn" id="sort-num-btn" title="Sort by number">🔢 Number</button>
+      </div>
+      <button class="btn btn-gold" id="hint-btn">💡 Hint</button>
+      <button class="btn" id="reset-btn">↺ Reset</button>
+      <button class="btn btn-red" id="draw-btn">Draw</button>
+      <button class="btn btn-green" id="confirm-btn">✓ Confirm</button>
+    </div>
+    <div class="hand-lbl" id="hand-lbl">Your Tiles</div>
+    <div class="sugg-strip" id="sugg-strip"></div>
+    <div class="hand-rack" id="hand-rack"></div>
+  </div>
+</div>
+
+<!-- AI overlay -->
+<div class="ai-overlay" id="ai-overlay">
+  <div class="ai-name" id="ai-name">AI THINKING…</div>
+  <div class="ai-spin"></div>
+</div>
+
+<!-- Hint panel -->
+<div class="hint-panel" id="hint-panel">
+  <div class="hint-hdr">
+    <div class="hint-title">💡 BEST MOVES</div>
+    <button class="hint-close" id="hint-close">✕</button>
+  </div>
+  <div class="hint-moves" id="hint-moves"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Win -->
+<div class="win-screen" id="win-screen">
+  <div class="win-title">🏆 WINNER!</div>
+  <div class="win-sub" id="win-sub"></div>
+  <div class="score-tbl" id="score-tbl"></div>
+  <button class="btn" onclick="location.reload()" style="margin-top:14px;padding:10px 28px;font-size:14px">Play Again</button>
+</div>
+
+<!-- Debug panel -->
+<div class="debug-panel" id="debug-panel">
+  <h4>🐛 Debug Log</h4>
+  <div id="debug-log"></div>
+</div>
+
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════
+// CONSTANTS & HELPERS
+// ════════════════════════════════════════════════════════
+const COLORS = ['red','blue','orange','black'];
+const COLOR_ORDER = {red:0,blue:1,orange:2,black:3};
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let debugMode = false;
+const debugLog = [];
+
+function dbg(msg, type='info') {
+  if (!debugMode) return;
+  debugLog.push({msg, type, ts: Date.now()});
+  const el = document.getElementById('debug-log');
+  if (!el) return;
+  const d = document.createElement('div');
+  d.className = `debug-line ${type}`;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.prepend(d);
+  if (el.children.length > 80) el.removeChild(el.lastChild);
+}
+
+function totalTileCount() {
+  if (!G) return;
+  const inHands = G.hands.reduce((s,h)=>s+h.length,0);
+  const onBoard = G.board.flat().length;
+  const inPool = G.pool.length;
+  const total = inHands + onBoard + inPool;
+  const expected = 106;
+  if (total !== expected) {
+    dbg(`⚠ TILE COUNT ERROR: hands=${inHands} board=${onBoard} pool=${inPool} total=${total} expected=${expected}`, 'err');
+  } else {
+    dbg(`✓ Tile count OK: hands=${inHands} board=${onBoard} pool=${inPool}`, 'ok');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// TILE ENGINE
+// ════════════════════════════════════════════════════════
+function buildPool() {
+  let id = 0;
+  const tiles = [];
+  for (let copy = 0; copy < 2; copy++)
+    for (const c of COLORS)
+      for (let n = 1; n <= 13; n++)
+        tiles.push({id:id++, color:c, num:n, isJoker:false});
+  tiles.push({id:id++, color:'joker', num:0, isJoker:true});
+  tiles.push({id:id++, color:'joker', num:0, isJoker:true});
+  // Fisher-Yates
+  for (let i=tiles.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tiles[i],tiles[j]]=[tiles[j],tiles[i]];}
+  return tiles;
+}
+
+function tileVal(t) { return t.isJoker ? 30 : t.num; }
+function handVal(h) { return h.reduce((s,t)=>s+tileVal(t),0); }
+
+// ── Validation ──
+function isRun(tiles) {
+  if (tiles.length < 3) return false;
+  const norm = tiles.filter(t=>!t.isJoker);
+  if (!norm.length) return false;
+  const colors = [...new Set(norm.map(t=>t.color))];
+  if (colors.length !== 1) return false;
+  const nums = norm.map(t=>t.num).sort((a,b)=>a-b);
+  const min=nums[0], max=nums[nums.length-1];
+  if (max-min+1 > 13) return false;
+  const seen=new Set();
+  for (const n of nums) { if(seen.has(n)) return false; seen.add(n); }
+  const jokers = tiles.length - norm.length;
+  const gaps = (max-min+1) - norm.length;
+  return jokers >= gaps;
+}
+
+function isGroup(tiles) {
+  if (tiles.length < 3 || tiles.length > 4) return false;
+  const norm = tiles.filter(t=>!t.isJoker);
+  if (!norm.length) return false;
+  const nums = [...new Set(norm.map(t=>t.num))];
+  if (nums.length !== 1) return false;
+  const cols = norm.map(t=>t.color);
+  return new Set(cols).size === cols.length;
+}
+
+function isValid(tiles) { return tiles.length>=3 && (isRun(tiles)||isGroup(tiles)); }
+function isValidBoard(sets) { return sets.every(s=>isValid(s)); }
+
+// ── Sort set ──
+function sortSet(tiles) {
+  const norm = tiles.filter(t=>!t.isJoker);
+  const jokers = tiles.filter(t=>t.isJoker);
+  if (!norm.length) return tiles;
+  const cols = [...new Set(norm.map(t=>t.color))];
+  if (cols.length === 1) {
+    // run — sort numerically, insert jokers in gaps
+    const sorted = [...norm].sort((a,b)=>a.num-b.num);
+    const out = [];
+    let ji=0;
+    for (let i=0;i<sorted.length;i++) {
+      if (i>0) {
+        const gap = sorted[i].num - sorted[i-1].num - 1;
+        for (let g=0;g<gap&&ji<jokers.length;g++,ji++) out.push(jokers[ji]);
+      }
+      out.push(sorted[i]);
+    }
+    while (ji<jokers.length) out.push(jokers[ji++]);
+    return out;
+  }
+  // group
+  return [...norm].sort((a,b)=>(COLOR_ORDER[a.color]||0)-(COLOR_ORDER[b.color]||0)).concat(jokers);
+}
+
+// ── Sort hand ──
+function sortHand(hand, mode) {
+  if (mode === 'color') {
+    return [...hand].sort((a,b) => {
+      if (a.isJoker && b.isJoker) return 0;
+      if (a.isJoker) return 1;
+      if (b.isJoker) return -1;
+      const cd = (COLOR_ORDER[a.color]||0)-(COLOR_ORDER[b.color]||0);
+      return cd !== 0 ? cd : a.num-b.num;
+    });
+  }
+  // number
+  return [...hand].sort((a,b) => {
+    if (a.isJoker && b.isJoker) return 0;
+    if (a.isJoker) return 1;
+    if (b.isJoker) return -1;
+    return a.num !== b.num ? a.num-b.num : (COLOR_ORDER[a.color]||0)-(COLOR_ORDER[b.color]||0);
+  });
+}
+
+// ════════════════════════════════════════════════════════
+// BOARD MANIPULATION — Joker liberation & set splitting
+// ════════════════════════════════════════════════════════
+
+// Find jokers on board that can be replaced by a hand tile,
+// freeing the joker to be used elsewhere
+function findJokerReplacements(hand, board) {
+  const results = [];
+  for (let si=0;si<board.length;si++) {
+    const set = board[si];
+    const jokerIdxs = set.map((t,i)=>t.isJoker?i:-1).filter(i=>i>=0);
+    for (const ji of jokerIdxs) {
+      // What number would this joker be?
+      const jokerNum = inferJokerValue(set, ji);
+      const jokerColor = inferJokerColor(set, ji);
+      if (jokerNum === null) continue;
+      // Find hand tiles that can replace it
+      for (const ht of hand) {
+        if (ht.isJoker) continue;
+        if (ht.num === jokerNum && (jokerColor === null || ht.color === jokerColor)) {
+          const newSet = [...set];
+          newSet[ji] = ht;
+          if (isValid(newSet)) {
+            results.push({si, ji, handTile:ht, joker:set[ji]});
+          }
+        }
+      }
+    }
+  }
+  return results;
+}
+
+function inferJokerValue(set, jokerIdx) {
+  const norm = set.filter(t=>!t.isJoker);
+  if (!norm.length) return null;
+  const cols = [...new Set(norm.map(t=>t.color))];
+  if (cols.length === 1) {
+    // run — find what number should be here
+    const sorted = [...norm].sort((a,b)=>a.num-b.num);
+    const min = sorted[0].num;
+    // reconstruct full range
+    const full = [];
+    let ji=0, ni=0;
+    const jokerIdxs = set.map((t,i)=>t.isJoker?i:-1).filter(i=>i>=0);
+    // Simple approach: sorted position
+    const nonJokerTiles = set.filter(t=>!t.isJoker).sort((a,b)=>a.num-b.num);
+    const fullRange = [];
+    for (let n=min;n<=min+set.length-1;n++) fullRange.push(n);
+    const usedNums = new Set(nonJokerTiles.map(t=>t.num));
+    const gaps = fullRange.filter(n=>!usedNums.has(n));
+    // jokerIdx among jokers
+    const ji2 = jokerIdxs.indexOf(jokerIdx);
+    return gaps[ji2] !== undefined ? gaps[ji2] : null;
+  } else {
+    // group — number is same as all normals
+    return norm[0].num;
+  }
+}
+
+function inferJokerColor(set, jokerIdx) {
+  const norm = set.filter(t=>!t.isJoker);
+  if (!norm.length) return null;
+  const cols = [...new Set(norm.map(t=>t.color))];
+  if (cols.length === 1) return cols[0]; // run — same color
+  return null; // group — any color (that's missing)
+}
+
+// Split a set at a given index: [0..splitIdx] and [splitIdx..end]
+// Returns array of new sets, or null if not valid
+function splitSet(set, splitIdx) {
+  if (splitIdx < 1 || splitIdx >= set.length-1) return null;
+  // For a run: we can split if both halves have >=3 tiles OR
+  // if we're inserting a tile at the split point creating a shared tile
+  const left = set.slice(0, splitIdx+1);
+  const right = set.slice(splitIdx);
+  if (left.length >= 3 && right.length >= 3 && isValid(left) && isValid(right)) {
+    return [left, right];
+  }
+  return null;
+}
+
+// Find all valid split points for a set + inserted tile
+// tile can be the "bridge" tile appearing in both sets
+function findSplitInserts(tile, set) {
+  const results = [];
+  if (!isRun(set)) return results;
+  const norm = set.filter(t=>!t.isJoker);
+  const cols = [...new Set(norm.map(t=>t.color))];
+  if (cols.length !== 1) return results;
+  if (tile.isJoker || tile.color !== cols[0]) return results;
+  // Try inserting tile at each position to split
+  for (let i=0;i<=set.length;i++) {
+    const trial = [...set.slice(0,i), tile, ...set.slice(i)];
+    // Now try all split points in trial
+    for (let s=1;s<trial.length-1;s++) {
+      // tile must appear in both halves
+      const tileIdx = trial.indexOf(tile, 0);
+      if (tileIdx < 0) continue;
+      const left = trial.slice(0,s+1);
+      const right = trial.slice(s);
+      if (!left.some(t=>t.id===tile.id)) continue;
+      if (!right.some(t=>t.id===tile.id)) continue;
+      if (left.length>=3 && right.length>=3 && isValid(left) && isValid(right)) {
+        results.push({insertPos:i, splitPos:s, left:sortSet(left), right:sortSet(right)});
+      }
+    }
+  }
+  return results;
+}
+
+// ════════════════════════════════════════════════════════
+// SET FINDER — exhaustive backtracking
+// ════════════════════════════════════════════════════════
+function findAllSets(tiles) {
+  const result = [];
+  const n = tiles.length;
+  function bt(start, cur) {
+    if (cur.length >= 3 && isValid(cur)) result.push([...cur]);
+    if (cur.length >= 13) return;
+    if (isGroup(cur) && cur.length >= 4) return;
+    for (let i=start;i<n;i++) bt(i+1,[...cur,tiles[i]]);
+  }
+  bt(0,[]);
+  const seen=new Set();
+  return result.filter(s=>{
+    const k=s.map(t=>t.id).sort().join(',');
+    if(seen.has(k)) return false; seen.add(k); return true;
+  });
+}
+
+// Best combination: maximise tiles placed, then value
+function bestCombination(tiles) {
+  const allSets = findAllSets(tiles);
+  if (!allSets.length) return {sets:[], count:0, value:0};
+  let bestSets=[], bestCount=0, bestValue=0;
+  function bt(remaining, chosen, usedIds) {
+    const c = [...usedIds].length;
+    const v = chosen.flat().reduce((s,t)=>s+tileVal(t),0);
+    if (c > bestCount || (c===bestCount && v>bestValue)) {
+      bestCount=c; bestValue=v; bestSets=chosen.map(s=>[...s]);
+    }
+    for (let i=0;i<remaining.length;i++) {
+      const set = remaining[i];
+      if (set.some(t=>usedIds.has(t.id))) continue;
+      const nu = new Set([...usedIds,...set.map(t=>t.id)]);
+      bt(remaining.slice(i+1),[...chosen,set],nu);
+    }
+  }
+  bt(allSets,[],new Set());
+  return {sets:bestSets, count:bestCount, value:bestValue};
+}
+
+// ════════════════════════════════════════════════════════
+// BOARD EXTENSIONS
+// ════════════════════════════════════════════════════════
+function findExtensions(hand, board) {
+  const results = [];
+  for (let si=0;si<board.length;si++) {
+    const set = board[si];
+    for (const t of hand) {
+      // prepend
+      if (isValid([t,...set])) results.push({si, pos:'start', tile:t, val:tileVal(t)});
+      // append
+      if (isValid([...set,t])) results.push({si, pos:'end', tile:t, val:tileVal(t)});
+      // insert inside run
+      if (isRun(set)) {
+        const norm=set.filter(x=>!x.isJoker);
+        if (norm.length && !t.isJoker) {
+          for (let i=1;i<set.length;i++) {
+            const trial=[...set.slice(0,i),t,...set.slice(i)];
+            if (isValid(trial)) results.push({si, pos:'insert', insertAt:i, tile:t, val:tileVal(t)});
+          }
+        }
+      }
+    }
+  }
+  return results;
+}
+
+// ════════════════════════════════════════════════════════
+// SMART HINTS — considers joker liberation + splitting
+// ════════════════════════════════════════════════════════
+function computeHints(hand, board, hasMeld) {
+  const hints = [];
+  const allUsedIds = new Set();
+
+  // 1) Best pure hand combination
+  const combo = bestCombination(hand);
+  if (combo.count > 0) {
+    const canMeld = !hasMeld && combo.value >= 30;
+    const type = hasMeld ? 'play' : (canMeld ? 'initial' : 'no-meld');
+    hints.push({
+      type, label: hasMeld ? 'BEST' : (canMeld ? 'MELD' : 'NO MELD'),
+      desc: `Play ${combo.count} tiles (${combo.value} pts)${!hasMeld&&!canMeld?' — need '+(30-combo.value)+' more pts':''}`,
+      sets: combo.sets, exts:[], splits:[], value:combo.value, count:combo.count,
+      applicable: hasMeld || canMeld
+    });
+    if (hasMeld || canMeld) combo.sets.flat().forEach(t=>allUsedIds.add(t.id));
+  } else if (!hand.every(t=>t.isJoker)) {
+    hints.push({
+      type:'no-meld', label:'NO MELD',
+      desc:`No valid sets in hand yet — try extending the board`,
+      sets:[], exts:[], splits:[], value:0, count:0, applicable:false
+    });
+  }
+
+  if (hasMeld) {
+    // 2) Board extensions (individual tiles)
+    const exts = findExtensions(hand, board);
+    const byTile = {};
+    for (const e of exts) {
+      const k = e.tile.id;
+      if (!byTile[k]) byTile[k]=[];
+      byTile[k].push(e);
+    }
+    for (const [tid, es] of Object.entries(byTile)) {
+      const t = es[0].tile;
+      if (allUsedIds.has(t.id)) continue;
+      hints.push({
+        type:'extend', label:'EXTEND',
+        desc:`${t.isJoker?'★':t.num} → extend ${es.length} set(s)`,
+        sets:[], exts:es, splits:[], value:tileVal(t), count:1, applicable:true, tile:t
+      });
+    }
+
+    // 3) Joker liberation
+    const jreps = findJokerReplacements(hand, board);
+    for (const rep of jreps) {
+      if (allUsedIds.has(rep.handTile.id)) continue;
+      hints.push({
+        type:'joker-lib', label:'JOKER',
+        desc:`Replace ★ in set ${rep.si+1} with ${rep.handTile.num}(${rep.handTile.color}) — free the joker!`,
+        sets:[], exts:[], splits:[], jrep:rep, value:tileVal(rep.handTile)+30, count:1, applicable:true
+      });
+    }
+
+    // 4) Split hints
+    for (let si=0;si<board.length;si++) {
+      const set = board[si];
+      for (const ht of hand) {
+        if (allUsedIds.has(ht.id)) continue;
+        const splits = findSplitInserts(ht, set);
+        for (const sp of splits) {
+          hints.push({
+            type:'split', label:'SPLIT',
+            desc:`Insert ${ht.num}(${ht.color}) to split set ${si+1} into 2 valid sets`,
+            sets:[], exts:[], splits:[{si, ...sp, tile:ht}], value:tileVal(ht), count:1, applicable:true, tile:ht
+          });
+        }
+      }
+    }
+  }
+
+  if (hints.filter(h=>h.applicable).length === 0) {
+    hints.push({
+      type:'draw', label:'DRAW',
+      desc:'No playable moves — draw a tile from the pool',
+      sets:[], exts:[], splits:[], value:0, count:0, applicable:false
+    });
+  }
+
+  // Sort: most tiles first, then value, then type priority
+  const typePri = {initial:0,play:0,extend:1,'joker-lib':2,split:3,'no-meld':4,draw:5};
+  return hints.sort((a,b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    if (b.value !== a.value) return b.value - a.value;
+    return (typePri[a.type]||9) - (typePri[b.type]||9);
+  });
+}
+
+// ════════════════════════════════════════════════════════
+// AI PLAY — smart, uses joker liberation + manipulation
+// ════════════════════════════════════════════════════════
+function aiPlayTurn(hand, board, hasMeld) {
+  let h = [...hand];
+  let b = board.map(s=>[...s]);
+  let moved = false;
+
+  // Step 1: Replace jokers on board with hand tiles to free jokers
+  let improved = true;
+  while (improved) {
+    improved = false;
+    const reps = findJokerReplacements(h, b);
+    if (reps.length > 0) {
+      const rep = reps[0];
+      // Replace joker with hand tile
+      b[rep.si][rep.ji] = rep.handTile;
+      h = h.filter(t=>t.id !== rep.handTile.id);
+      // Add freed joker to hand
+      h.push(rep.joker);
+      improved = true; moved = true;
+      dbg(`AI: Freed joker from set ${rep.si} using ${rep.handTile.num}(${rep.handTile.color})`, 'ok');
+    }
+  }
+
+  // Step 2: Extend board sets
+  improved = true;
+  while (improved) {
+    improved = false;
+    const exts = findExtensions(h, b);
+    if (exts.length > 0) {
+      const ext = exts[0];
+      h = h.filter(t=>t.id !== ext.tile.id);
+      if (ext.pos === 'start') b[ext.si] = sortSet([ext.tile,...b[ext.si]]);
+      else if (ext.pos === 'end') b[ext.si] = sortSet([...b[ext.si],ext.tile]);
+      else { // insert
+        b[ext.si] = sortSet([...b[ext.si].slice(0,ext.insertAt),ext.tile,...b[ext.si].slice(ext.insertAt)]);
+      }
+      improved = true; moved = true;
+      dbg(`AI: Extended set ${ext.si} with ${ext.tile.num}(${ext.tile.color})`, 'ok');
+    }
+  }
+
+  // Step 3: Play new sets from hand (best combination)
+  const combo = bestCombination(h);
+  if (combo.count > 0) {
+    const v = combo.value;
+    if (!hasMeld && v < 30) {
+      dbg(`AI: Combo value ${v} < 30, can't meld yet`,'warn');
+    } else {
+      const usedIds = new Set(combo.sets.flat().map(t=>t.id));
+      h = h.filter(t=>!usedIds.has(t.id));
+      for (const set of combo.sets) b.push(sortSet(set));
+      moved = true;
+      const meldAchieved = !hasMeld && v >= 30;
+      dbg(`AI: Placed ${combo.count} tiles (${v} pts) ${meldAchieved?'MELD!':''}`, 'ok');
+      return {newHand:h, newBoard:b, moved:true, meldAchieved};
+    }
+  }
+
+  return {newHand:h, newBoard:b, moved, meldAchieved:false};
+}
+
+// ════════════════════════════════════════════════════════
+// GAME STATE
+// ════════════════════════════════════════════════════════
+let G = null;
+let sortMode = 'color';
+
+function initGame(players) {
+  const pool = buildPool();
+  const hands = players.map(()=>{
+    const h=[];
+    for(let i=0;i<14;i++) h.push(pool.pop());
+    return h;
+  });
+  dbg(`Game started: ${players.length} players, ${pool.length} pool tiles`,'ok');
+  totalTileCount();
+  return {
+    pool, players, hands,
+    board: [],
+    hasMeld: players.map(()=>false),
+    currentPlayer: 0,
+    phase: 'play',
+    finalRoundStart: -1,
+    pendingBoard: null,
+    pendingHand: null,
+    lastTurnHighlight: null, // pi who triggered last turn
+    aiMoveLog: [], // for showing AI moves
+  };
+}
+
+// ════════════════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════════════════
+let selectedIds = new Set();
+let dragState = {active:false, tile:null, src:null, srcSi:null};
+
+function renderGame() {
+  if (!G) return;
+  renderHeader();
+  renderBoard();
+  renderBottom();
+}
+
+function renderHeader() {
+  const tabs = document.getElementById('ptabs');
+  tabs.innerHTML = '';
+  G.players.forEach((p,i) => {
+    const d = document.createElement('div');
+    d.className = 'ptab' + (i===G.currentPlayer?' cur':'');
+    const isLast = G.phase==='final';
+    if (isLast) d.classList.add('last-turn');
+    d.innerHTML = `${p.name}<span class="tc">${G.hands[i].length}🀫</span>${G.hasMeld[i]?'':' <span style="color:#f07070;font-size:8px">no meld</span>'}`;
+    tabs.appendChild(d);
+  });
+  document.getElementById('pool-info').textContent = `Pool: ${G.pool.length}`;
+  const lt = document.getElementById('lt-banner');
+  lt.classList.toggle('vis', G.phase==='final');
+}
+
+function renderBoard() {
+  const container = document.getElementById('board-sets');
+  container.innerHTML = '';
+  const board = G.pendingBoard || G.board;
+  const prevBoardIds = new Set(G.board.flat().map(t=>t.id));
+  const isHuman = G.players[G.currentPlayer].type==='human';
+
+  board.forEach((set, si) => {
+    const div = document.createElement('div');
+    div.className = 'bset';
+    if (!isValid(set)) div.classList.add('invalid');
+    // AI-new sets: highlight new tiles
+    const hasNewTile = set.some(t=>!prevBoardIds.has(t.id));
+    if (hasNewTile && G.aiMoveLog.length) div.classList.add('ai-new');
+
+    const lbl = isValid(set) ? (isRun(set)?'run':'group') : '⚠ invalid';
+    div.innerHTML = `<div class="bset-lbl">${lbl}</div>`;
+
+    set.forEach((tile, ti) => {
+      // Insert drop indicator
+      const ins = document.createElement('div');
+      ins.className = 'drop-insert';
+      ins.dataset.si = si;
+      ins.dataset.pos = ti;
+      div.appendChild(ins);
+
+      const tel = createTileEl(tile, 'board', si, ti);
+      div.appendChild(tel);
+    });
+    // trailing insert
+    const insEnd = document.createElement('div');
+    insEnd.className = 'drop-insert';
+    insEnd.dataset.si = si;
+    insEnd.dataset.pos = set.length;
+    div.appendChild(insEnd);
+
+    // Drop on set
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (!isHuman) return;
+      div.classList.add('drop-target');
+      // find nearest insert line
+      highlightInsert(div, e.clientX);
+    });
+    div.addEventListener('dragleave', e => {
+      if (!div.contains(e.relatedTarget)) {
+        div.classList.remove('drop-target');
+        div.querySelectorAll('.drop-insert').forEach(i=>i.classList.remove('vis'));
+      }
+    });
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      div.classList.remove('drop-target');
+      const pos = getInsertPos(div, e.clientX);
+      handleDropOnSet(si, pos);
+      div.querySelectorAll('.drop-insert').forEach(i=>i.classList.remove('vis'));
+    });
+
+    container.appendChild(div);
+  });
+
+  // New set zone
+  const nz = document.createElement('div');
+  nz.className = 'new-set-zone';
+  nz.textContent = '+ New Set';
+  nz.addEventListener('dragover', e=>{e.preventDefault();nz.classList.add('drag-over')});
+  nz.addEventListener('dragleave', ()=>nz.classList.remove('drag-over'));
+  nz.addEventListener('drop', e=>{e.preventDefault();nz.classList.remove('drag-over');handleDropNewSet()});
+  container.appendChild(nz);
+
+  // Board area drop
+  const ba = document.getElementById('board-area');
+  ba.ondragover = e => { e.preventDefault(); };
+  ba.ondrop = e => {
+    e.preventDefault();
+    if (e.target===ba||e.target.id==='board-sets') handleDropNewSet();
+  };
+}
+
+function highlightInsert(setDiv, clientX) {
+  const inserts = setDiv.querySelectorAll('.drop-insert');
+  let best=null, bestDist=Infinity;
+  inserts.forEach(ins => {
+    const r = ins.getBoundingClientRect();
+    const cx = r.left+r.width/2;
+    const dist = Math.abs(clientX-cx);
+    if (dist<bestDist) { bestDist=dist; best=ins; }
+  });
+  inserts.forEach(i=>i.classList.remove('vis'));
+  if (best) best.classList.add('vis');
+}
+
+function getInsertPos(setDiv, clientX) {
+  const tiles = setDiv.querySelectorAll('.tile');
+  let pos = (G.pendingBoard||G.board)[parseInt(setDiv.querySelector('[data-si]').dataset.si)].length;
+  tiles.forEach((tel, i) => {
+    const r = tel.getBoundingClientRect();
+    if (clientX < r.left+r.width/2) { pos=Math.min(pos,i); }
+  });
+  return pos;
+}
+
+function createTileEl(tile, src, si, ti) {
+  const div = document.createElement('div');
+  const cls = ['tile','c-'+tile.color];
+  if (src==='board') cls.push('in-board');
+  if (selectedIds.has(tile.id)) cls.push('selected');
+  div.className = cls.join(' ');
+  div.dataset.id = tile.id;
+  div.dataset.src = src;
+  if (si!==undefined) div.dataset.si=si;
+  div.dataset.ti=ti;
+
+  if (tile.isJoker) {
+    div.innerHTML=`<div class="t-num">★</div>`;
+  } else {
+    div.innerHTML=`<div class="t-num">${tile.num}</div>`;
+  }
+
+  const isHuman = G.players[G.currentPlayer].type==='human';
+  if (!isHuman) { div.style.cursor='default'; return div; }
+
+  div.draggable = true;
+  div.addEventListener('dragstart', e=>handleDragStart(e,tile,src,si));
+  div.addEventListener('dragend', handleDragEnd);
+
+  if (src==='board') {
+    div.addEventListener('dblclick', ()=>returnToHand(tile,si));
+    div.title='Double-click to return to hand';
+  }
+  return div;
+}
+
+function renderBottom() {
+  const isHuman = G.players[G.currentPlayer].type==='human';
+  const hand = G.pendingHand || G.hands[G.currentPlayer];
+  const board = G.pendingBoard || G.board;
+  const hasMeld = G.hasMeld[G.currentPlayer];
+
+  document.getElementById('turn-info').textContent = `${G.players[G.currentPlayer].name}'s Turn`;
+  document.getElementById('hand-lbl').textContent = isHuman ? 'Your Tiles' : `${G.players[G.currentPlayer].name}'s Tiles`;
+
+  // Sort buttons
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById(sortMode==='color'?'sort-color-btn':'sort-num-btn').classList.add('on');
+
+  // Suggestions strip
+  const strip = document.getElementById('sugg-strip');
+  strip.innerHTML = '';
+  if (isHuman) {
+    const allSets = findAllSets(hand);
+    const sorted = allSets.sort((a,b)=>b.length-a.length||b.reduce((s,t)=>s+tileVal(t),0)-a.reduce((s,t)=>s+tileVal(t),0));
+    sorted.slice(0,10).forEach(set=>{
+      const v=set.reduce((s,t)=>s+tileVal(t),0);
+      const canPlay = hasMeld || v>=30;
+      const div=document.createElement('div');
+      div.className='sugg-set'+(canPlay?'':' dimmed');
+      set.forEach(t=>{
+        const m=document.createElement('div');
+        m.className='mt c-'+t.color;
+        m.textContent=t.isJoker?'★':t.num;
+        div.appendChild(m);
+      });
+      const sp=document.createElement('span');
+      sp.style.cssText='font-size:9px;color:rgba(255,255,255,.4);margin-left:3px';
+      sp.textContent=v+'p';
+      div.appendChild(sp);
+      if (canPlay) div.addEventListener('click',()=>playSuggestion(set));
+      strip.appendChild(div);
+    });
+  }
+
+  // Hand rack — sorted, with separator between playable and rest
+  const rack = document.getElementById('hand-rack');
+  rack.innerHTML = '';
+
+  const sorted = sortHand(hand, sortMode);
+
+  // Find which tiles are part of any valid set
+  const allSets = findAllSets(sorted);
+  const playableIds = new Set(allSets.flat().map(t=>t.id));
+
+  // Separate playable from non-playable
+  const playable = sorted.filter(t=>playableIds.has(t.id));
+  const rest = sorted.filter(t=>!playableIds.has(t.id));
+
+  const renderTile = (tile,i) => {
+    const w = document.createElement('div');
+    w.style.cssText='position:relative;display:inline-flex;flex-direction:column;align-items:center';
+    const tel = createTileEl(tile, 'hand', undefined, i);
+    if (isHuman) {
+      tel.addEventListener('click', e=>handleTileClick(e,tile));
+      tel.addEventListener('dblclick', e=>handleTileDblClick(e,tile));
+      // Long press
+      setupLongPress(tel, tile);
+    }
+    w.appendChild(tel);
+    rack.appendChild(w);
+  };
+
+  playable.forEach(renderTile);
+
+  if (playable.length > 0 && rest.length > 0) {
+    const sep=document.createElement('div');
+    sep.className='hand-sep';
+    rack.appendChild(sep);
+  }
+
+  rest.forEach(renderTile);
+
+  // Buttons
+  document.getElementById('hint-btn').disabled=!isHuman;
+  document.getElementById('confirm-btn').disabled=!isHuman;
+  document.getElementById('draw-btn').disabled=!isHuman;
+  document.getElementById('reset-btn').disabled=!isHuman;
+}
+
+// ════════════════════════════════════════════════════════
+// LONG PRESS — lasso select tiles left to right
+// ════════════════════════════════════════════════════════
+let longPressTimer = null;
+let longPressActive = false;
+let lassoStartTile = null;
+
+function setupLongPress(el, tile) {
+  el.addEventListener('pointerdown', e=>{
+    longPressTimer = setTimeout(()=>{
+      longPressActive = true;
+      lassoStartTile = tile;
+      el.classList.add('lasso');
+      selectedIds.add(tile.id);
+      updateSelectedVisuals();
+      startLassoSweep(tile);
+    }, 400);
+  });
+  el.addEventListener('pointerup', ()=>{
+    clearTimeout(longPressTimer);
+    if (longPressActive) {
+      longPressActive = false;
+      lassoStartTile = null;
+    }
+  });
+  el.addEventListener('pointercancel', ()=>{
+    clearTimeout(longPressTimer);
+    longPressActive = false;
+  });
+}
+
+function startLassoSweep(startTile) {
+  // Sweep through tiles from start position to right, selecting compatible ones
+  const hand = G.pendingHand || G.hands[G.currentPlayer];
+  const sorted = sortHand(hand, sortMode);
+  const startIdx = sorted.findIndex(t=>t.id===startTile.id);
+  if (startIdx<0) return;
+
+  let i = startIdx+1;
+  const sweepInterval = setInterval(()=>{
+    if (!longPressActive || i>=sorted.length) {
+      clearInterval(sweepInterval);
+      return;
+    }
+    const t = sorted[i];
+    selectedIds.add(t.id);
+    const el = document.querySelector(`.hand-rack [data-id="${t.id}"]`);
+    if (el) {
+      el.classList.add('lasso');
+      el.classList.add('selected');
+    }
+    i++;
+  }, 120);
+}
+
+function updateSelectedVisuals() {
+  document.querySelectorAll('.hand-rack .tile').forEach(el=>{
+    const id = parseInt(el.dataset.id);
+    el.classList.toggle('selected', selectedIds.has(id));
+  });
+}
+
+// ════════════════════════════════════════════════════════
+// DRAG & DROP
+// ════════════════════════════════════════════════════════
+function handleDragStart(e, tile, src, si) {
+  dragState = {active:true, tile, src, srcSi:si!==undefined?si:null};
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('id', tile.id);
+
+  // Custom ghost
+  const ghost = document.createElement('div');
+  ghost.className = 'tile c-'+tile.color+(tile.isJoker?' c-joker':'');
+  ghost.style.cssText='position:fixed;top:-100px;width:42px;height:54px;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:4px;background:#fefcf6;box-shadow:0 8px 20px rgba(0,0,0,.5);pointer-events:none';
+  ghost.textContent = tile.isJoker?'★':tile.num;
+  if (tile.isJoker) ghost.style.background='linear-gradient(135deg,#1a1a2e,#2e1a60)';
+  document.body.appendChild(ghost);
+  e.dataTransfer.setDragImage(ghost,21,27);
+  dragState.ghost=ghost;
+
+  // Animation: tile rises
+  requestAnimationFrame(()=>{
+    const el=document.querySelector(`[data-id="${tile.id}"]`);
+    if(el) el.classList.add('dragging');
+  });
+}
+
+function handleDragEnd() {
+  if (dragState.ghost) { dragState.ghost.remove(); dragState.ghost=null; }
+  document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
+  document.querySelectorAll('.drop-target').forEach(el=>el.classList.remove('drop-target'));
+  document.querySelectorAll('.drop-insert.vis').forEach(el=>el.classList.remove('vis'));
+  dragState.active=false;
+}
+
+function handleDropOnSet(targetSi, insertPos) {
+  if (!dragState.tile) return;
+  ensurePending();
+  const tile = dragState.tile;
+  const src = dragState.src;
+  const srcSi = dragState.srcSi;
+
+  if (src==='hand') {
+    G.pendingHand = G.pendingHand.filter(t=>t.id!==tile.id);
+    selectedIds.delete(tile.id);
+  } else if (src==='board' && srcSi!==null) {
+    G.pendingBoard[srcSi] = G.pendingBoard[srcSi].filter(t=>t.id!==tile.id);
+    if (G.pendingBoard[srcSi].length===0) {
+      G.pendingBoard.splice(srcSi,1);
+      if (targetSi>srcSi) targetSi--;
+    }
+  }
+
+  if (targetSi<G.pendingBoard.length) {
+    const set = G.pendingBoard[targetSi];
+    // Insert at position or end
+    const pos = Math.min(insertPos!==undefined?insertPos:set.length, set.length);
+    const newSet = [...set.slice(0,pos),tile,...set.slice(pos)];
+    G.pendingBoard[targetSi] = sortSet(newSet);
+  } else {
+    G.pendingBoard.push([tile]);
+  }
+  dragState.tile=null;
+  renderGame();
+  flashTile(tile.id);
+}
+
+function handleDropNewSet() {
+  if (!dragState.tile) return;
+  ensurePending();
+  const tile = dragState.tile;
+  const src = dragState.src;
+  const srcSi = dragState.srcSi;
+
+  if (src==='hand') {
+    G.pendingHand = G.pendingHand.filter(t=>t.id!==tile.id);
+    selectedIds.delete(tile.id);
+  } else if (src==='board' && srcSi!==null) {
+    G.pendingBoard[srcSi]=G.pendingBoard[srcSi].filter(t=>t.id!==tile.id);
+    if (G.pendingBoard[srcSi].length===0) G.pendingBoard.splice(srcSi,1);
+  }
+  G.pendingBoard.push([tile]);
+  dragState.tile=null;
+  renderGame();
+}
+
+// ════════════════════════════════════════════════════════
+// TILE INTERACTIONS
+// ════════════════════════════════════════════════════════
+function handleTileClick(e, tile) {
+  e.stopPropagation();
+  selectedIds.has(tile.id) ? selectedIds.delete(tile.id) : selectedIds.add(tile.id);
+  const el=document.querySelector(`.hand-rack [data-id="${tile.id}"]`);
+  if(el) el.classList.toggle('selected', selectedIds.has(tile.id));
+}
+
+function handleTileDblClick(e, tile) {
+  e.stopPropagation();
+  e.preventDefault();
+  // Don't disturb selection — just auto-place
+  autoPlace(tile);
+}
+
+function autoPlace(tile) {
+  ensurePending();
+  const hand = G.pendingHand;
+  const board = G.pendingBoard;
+
+  // Try board extension
+  const exts = findExtensions([tile], board);
+  if (exts.length>0) {
+    const ext=exts[0];
+    G.pendingHand=hand.filter(t=>t.id!==tile.id);
+    if (ext.pos==='start') board[ext.si]=sortSet([tile,...board[ext.si]]);
+    else if (ext.pos==='end') board[ext.si]=sortSet([...board[ext.si],tile]);
+    else board[ext.si]=sortSet([...board[ext.si].slice(0,ext.insertAt),tile,...board[ext.si].slice(ext.insertAt)]);
+    selectedIds.delete(tile.id);
+    renderGame(); flashTile(tile.id); return;
+  }
+
+  // Try forming a new set with selected tiles
+  const pool = [...new Set([tile.id,...selectedIds])].map(id=>hand.find(t=>t.id===id)).filter(Boolean);
+  const sets = findAllSets(pool);
+  const best = sets.filter(s=>s.some(t=>t.id===tile.id)).sort((a,b)=>b.length-a.length)[0];
+  if (best) {
+    const ids=new Set(best.map(t=>t.id));
+    G.pendingHand=hand.filter(t=>!ids.has(t.id));
+    board.push(sortSet(best));
+    ids.forEach(id=>selectedIds.delete(id));
+    renderGame(); return;
+  }
+
+  showToast('No valid placement — try selecting more tiles first','info');
+}
+
+function returnToHand(tile, si) {
+  const prevIds=new Set(G.board.flat().map(t=>t.id));
+  if (prevIds.has(tile.id)) { showToast('Cannot return original board tiles to hand'); return; }
+  ensurePending();
+  G.pendingBoard[si]=G.pendingBoard[si].filter(t=>t.id!==tile.id);
+  if (G.pendingBoard[si].length===0) G.pendingBoard.splice(si,1);
+  G.pendingHand.push(tile);
+  renderGame();
+}
+
+function playSuggestion(set) {
+  ensurePending();
+  const ids=new Set(set.map(t=>t.id));
+  G.pendingHand=G.pendingHand.filter(t=>!ids.has(t.id));
+  G.pendingBoard.push(sortSet(set));
+  ids.forEach(id=>selectedIds.delete(id));
+  renderGame();
+}
+
+function flashTile(id) {
+  setTimeout(()=>{
+    const el=document.querySelector(`[data-id="${id}"]`);
+    if(el){el.classList.add('bounce');setTimeout(()=>el.classList.remove('bounce'),350);}
+  },40);
+}
+
+function ensurePending() {
+  if (!G.pendingBoard) G.pendingBoard=G.board.map(s=>[...s]);
+  if (!G.pendingHand) G.pendingHand=[...G.hands[G.currentPlayer]];
+}
+
+// ════════════════════════════════════════════════════════
+// CONFIRM / RESET / DRAW
+// ════════════════════════════════════════════════════════
+function handleConfirm() {
+  const pi=G.currentPlayer;
+  ensurePending();
+  const nb=G.pendingBoard, nh=G.pendingHand;
+
+  if (!isValidBoard(nb)) { showToast('Board has invalid sets — fix before confirming!'); return; }
+
+  const prevBoardIds=new Set(G.board.flat().map(t=>t.id));
+  const newBoardIds=new Set(nb.flat().map(t=>t.id));
+  const placed=[...newBoardIds].filter(id=>!prevBoardIds.has(id));
+  if (placed.length===0) { showToast('Place at least one tile, or Draw & Pass'); return; }
+
+  const prevHandIds=new Set(G.hands[pi].map(t=>t.id));
+  const newHandIds=new Set(nh.map(t=>t.id));
+  const takenFromBoard=[...prevBoardIds].filter(id=>!newBoardIds.has(id)&&newHandIds.has(id));
+  if (takenFromBoard.length>0) { showToast('Cannot take tiles from board back to hand!'); return; }
+
+  if (!G.hasMeld[pi]) {
+    const placed2=G.hands[pi].filter(t=>placed.includes(t.id));
+    const v=placed2.reduce((s,t)=>s+tileVal(t),0);
+    if (v<30) { showToast(`Initial meld needs 30+ pts. You placed ${v} pts.`); return; }
+    G.hasMeld[pi]=true;
+  }
+
+  G.board=nb; G.hands[pi]=nh;
+  G.pendingBoard=null; G.pendingHand=null;
+  selectedIds.clear();
+  dbg(`Player ${G.players[pi].name} confirmed. Hand: ${nh.length}, Board sets: ${nb.length}`,'ok');
+  totalTileCount();
+
+  if (nh.length===0) { endGame(pi); return; }
+  advanceTurn();
+}
+
+function handleReset() {
+  G.pendingBoard=null; G.pendingHand=null; selectedIds.clear();
+  renderGame();
+}
+
+function handleDraw() {
+  const pi=G.currentPlayer;
+  if (G.pool.length>0) {
+    G.hands[pi].push(G.pool.pop());
+    showToast(`Drew a tile. Pool: ${G.pool.length}`,'info');
+    dbg(`${G.players[pi].name} drew. Pool now ${G.pool.length}`,'info');
+  } else {
+    showToast('Pool is empty!','info');
+  }
+  G.pendingBoard=null; G.pendingHand=null; selectedIds.clear();
+  if (G.pool.length===0&&G.phase!=='final') {
+    G.phase='final'; G.finalRoundStart=G.currentPlayer;
+    dbg('Final round started!','warn');
+  }
+  totalTileCount();
+  advanceTurn();
+}
+
+function advanceTurn() {
+  const n=G.players.length;
+  const next=(G.currentPlayer+1)%n;
+  if (G.phase==='final'&&next===G.finalRoundStart) { endGame(-1); return; }
+  G.currentPlayer=next;
+  G.pendingBoard=null; G.pendingHand=null; selectedIds.clear();
+  G.aiMoveLog=[];
+  renderGame();
+  maybeRunAI();
+}
+
+// ════════════════════════════════════════════════════════
+// AI TURN — animated, visible
+// ════════════════════════════════════════════════════════
+let aiRunning=false;
+
+function maybeRunAI() {
+  const pi=G.currentPlayer;
+  if (G.players[pi].type==='human') return;
+  if (aiRunning) return;
+  // Show overlay briefly
+  const ov=document.getElementById('ai-overlay');
+  document.getElementById('ai-name').textContent=`${G.players[pi].name} thinking…`;
+  ov.classList.add('vis');
+  setTimeout(()=>{ ov.classList.remove('vis'); runAITurn(pi); }, 700);
+}
+
+async function runAITurn(pi) {
+  aiRunning=true;
+  const hand=[...G.hands[pi]];
+  const board=G.board.map(s=>[...s]);
+  const hasMeld=G.hasMeld[pi];
+
+  const result=aiPlayTurn(hand,board,hasMeld);
+
+  dbg(`AI ${G.players[pi].name}: placed=${hand.length-result.newHand.length} meld=${result.meldAchieved}`,'ok');
+
+  if (!result.moved) {
+    // Draw
+    if (G.pool.length>0) {
+      G.hands[pi].push(G.pool.pop());
+      dbg(`AI ${G.players[pi].name} drew.`,'info');
+    }
+    if (G.pool.length===0&&G.phase!=='final') {
+      G.phase='final'; G.finalRoundStart=pi;
+    }
+    if (result.meldAchieved) G.hasMeld[pi]=true;
+    totalTileCount();
+    aiRunning=false;
+    advanceTurn();
+    return;
+  }
+
+  if (result.meldAchieved) G.hasMeld[pi]=true;
+
+  // Find placed tiles
+  const prevIds=new Set(G.board.flat().map(t=>t.id));
+  const placed=result.newBoard.flat().filter(t=>!prevIds.has(t.id));
+
+  // Update state
+  G.hands[pi]=result.newHand;
+  G.board=result.newBoard;
+  G.aiMoveLog=placed.map(t=>t.id);
+  totalTileCount();
+  renderGame();
+
+  // Animate placed tiles
+  for (const t of placed) {
+    await sleep(60);
+    const el=document.querySelector(`[data-id="${t.id}"]`);
+    if (el) { el.classList.add('ai-drop'); setTimeout(()=>el.classList.remove('ai-drop'),400); }
+  }
+
+  await sleep(200+placed.length*50);
+
+  if (result.newHand.length===0) { aiRunning=false; endGame(pi); return; }
+  aiRunning=false;
+  advanceTurn();
+}
+
+// ════════════════════════════════════════════════════════
+// HINTS UI
+// ════════════════════════════════════════════════════════
+function showHintPanel() {
+  const pi=G.currentPlayer;
+  const hand=G.pendingHand||G.hands[pi];
+  const board=G.pendingBoard||G.board;
+  const hasMeld=G.hasMeld[pi];
+  const hints=computeHints(hand,board,hasMeld);
+  const movesEl=document.getElementById('hint-moves');
+  movesEl.innerHTML='';
+
+  hints.forEach((hint,idx)=>{
+    const div=document.createElement('div');
+    div.className='hint-move'+(idx===0?' best':'');
+
+    const badge=document.createElement('div');
+    badge.className='hm-badge'+(['draw','no-meld'].includes(hint.type)?' draw':'');
+    badge.textContent=hint.label;
+
+    const desc=document.createElement('div');
+    desc.className='hm-desc';
+    desc.textContent=hint.desc;
+
+    const tiles=document.createElement('div');
+    tiles.className='hm-tiles';
+    const allT=[...hint.sets.flat()];
+    if (hint.jrep) allT.push(hint.jrep.handTile);
+    if (hint.tile && !hint.sets.flat().some(t=>t.id===hint.tile?.id)) allT.push(hint.tile);
+    allT.slice(0,14).forEach(t=>{
+      const m=document.createElement('div');
+      m.className='mt c-'+t.color;
+      m.textContent=t.isJoker?'★':t.num;
+      tiles.appendChild(m);
+    });
+
+    const pts=document.createElement('div');
+    pts.className='hm-pts';
+    if (hint.value>0) pts.textContent=hint.value+'p';
+
+    div.appendChild(badge); div.appendChild(desc); div.appendChild(tiles); div.appendChild(pts);
+
+    if (hint.applicable) {
+      div.addEventListener('click',()=>{ applyHint(hint); closeHint(); });
+    }
+    movesEl.appendChild(div);
+  });
+
+  document.getElementById('hint-panel').classList.add('vis');
+}
+
+function closeHint() { document.getElementById('hint-panel').classList.remove('vis'); }
+
+function applyHint(hint) {
+  ensurePending();
+  // New sets
+  if (hint.sets.length>0) {
+    const ids=new Set(hint.sets.flat().map(t=>t.id));
+    G.pendingHand=G.pendingHand.filter(t=>!ids.has(t.id));
+    hint.sets.forEach(s=>G.pendingBoard.push(sortSet(s)));
+    ids.forEach(id=>selectedIds.delete(id));
+  }
+  // Extensions
+  if (hint.exts&&hint.exts.length>0) {
+    const ext=hint.exts[0];
+    G.pendingHand=G.pendingHand.filter(t=>t.id!==ext.tile.id);
+    if (ext.pos==='start') G.pendingBoard[ext.si]=sortSet([ext.tile,...G.pendingBoard[ext.si]]);
+    else if (ext.pos==='end') G.pendingBoard[ext.si]=sortSet([...G.pendingBoard[ext.si],ext.tile]);
+    else G.pendingBoard[ext.si]=sortSet([...G.pendingBoard[ext.si].slice(0,ext.insertAt),ext.tile,...G.pendingBoard[ext.si].slice(ext.insertAt)]);
+    selectedIds.delete(ext.tile.id);
+  }
+  // Joker lib
+  if (hint.jrep) {
+    const {si,ji,handTile,joker}=hint.jrep;
+    G.pendingBoard[si][ji]=handTile;
+    G.pendingHand=G.pendingHand.filter(t=>t.id!==handTile.id);
+    G.pendingHand.push(joker); // freed joker back to hand
+    selectedIds.delete(handTile.id);
+  }
+  // Split
+  if (hint.splits&&hint.splits.length>0) {
+    const sp=hint.splits[0];
+    const {si,left,right,tile}=sp;
+    G.pendingHand=G.pendingHand.filter(t=>t.id!==tile.id);
+    G.pendingBoard.splice(si,1,left,right);
+    selectedIds.delete(tile.id);
+  }
+  selectedIds.clear();
+  renderGame();
+}
+
+// ════════════════════════════════════════════════════════
+// WIN
+// ════════════════════════════════════════════════════════
+function endGame(winnerIdx) {
+  G.phase='end';
+  const scores=G.players.map((p,i)=>({name:p.name,val:handVal(G.hands[i]),cnt:G.hands[i].length}));
+  let wi=winnerIdx;
+  if (wi<0) {
+    const min=Math.min(...scores.map(s=>s.val));
+    wi=scores.findIndex(s=>s.val===min);
+  }
+  document.getElementById('win-sub').textContent=`${G.players[wi].name} wins!`;
+  const sorted=[...scores].sort((a,b)=>a.val-b.val);
+  document.getElementById('score-tbl').innerHTML=sorted.map((s,i)=>`
+    <div class="score-row">
+      <span class="sr-pos">${i+1}.</span>
+      <span>${s.name}</span>
+      <span>${s.cnt} tiles</span>
+      <span style="color:${i===0?'#f4c430':'rgba(255,255,255,.5)'}">-${s.val}pts</span>
+    </div>`).join('');
+  document.getElementById('win-screen').classList.add('vis');
+  dbg(`Game over. Winner: ${G.players[wi].name}`,'ok');
+}
+
+// ════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════
+let toastT=null;
+function showToast(msg,type='error'){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`toast vis ${type}`;
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>el.classList.remove('vis'),3200);
+}
+
+// ════════════════════════════════════════════════════════
+// SETUP
+// ════════════════════════════════════════════════════════
+let setupPs=[
+  {name:'You',type:'human'},
+  {name:'AI Aria',type:'ai'}
+];
+
+function renderSetup(){
+  const c=document.getElementById('player-rows');
+  c.innerHTML='';
+  setupPs.forEach((p,i)=>{
+    const r=document.createElement('div');
+    r.className='player-row';
+    r.innerHTML=`
+      <div class="p-num">${i+1}</div>
+      <input class="p-name" value="${p.name}" data-i="${i}" placeholder="Player ${i+1}">
+      <div class="type-btns">
+        <button class="tbtn ${p.type==='human'?'on':''}" data-i="${i}" data-t="human">Human</button>
+        <button class="tbtn ${p.type==='ai'?'on':''}" data-i="${i}" data-t="ai">AI</button>
+      </div>
+      ${setupPs.length>2?`<button class="btn" style="padding:3px 7px;font-size:10px" data-rm="${i}">✕</button>`:''}
+    `;
+    c.appendChild(r);
+  });
+  c.querySelectorAll('.p-name').forEach(el=>el.addEventListener('input',e=>setupPs[e.target.dataset.i].name=e.target.value));
+  c.querySelectorAll('.tbtn').forEach(el=>el.addEventListener('click',e=>{
+    setupPs[e.target.dataset.i].type=e.target.dataset.t; renderSetup();
+  }));
+  c.querySelectorAll('[data-rm]').forEach(el=>el.addEventListener('click',e=>{
+    setupPs.splice(parseInt(e.target.dataset.rm),1); renderSetup();
+  }));
+  document.getElementById('add-p-btn').style.display=setupPs.length>=4?'none':'block';
+}
+
+// ════════════════════════════════════════════════════════
+// WIRING
+// ════════════════════════════════════════════════════════
+document.getElementById('add-p-btn').addEventListener('click',()=>{
+  if(setupPs.length<4){
+    setupPs.push({name:`AI ${['Bolt','Cruz','Dune'][setupPs.length-2]}`,type:'ai'});
+    renderSetup();
+  }
+});
+
+document.getElementById('start-btn').addEventListener('click',()=>{
+  G=initGame(setupPs.map(p=>({...p})));
+  document.getElementById('setup').style.display='none';
+  document.getElementById('game').style.display='flex';
+  renderGame();
+  maybeRunAI();
+});
+
+document.getElementById('sort-color-btn').addEventListener('click',()=>{sortMode='color';renderGame();});
+document.getElementById('sort-num-btn').addEventListener('click',()=>{sortMode='num';renderGame();});
+document.getElementById('hint-btn').addEventListener('click',showHintPanel);
+document.getElementById('hint-close').addEventListener('click',closeHint);
+document.getElementById('confirm-btn').addEventListener('click',handleConfirm);
+document.getElementById('reset-btn').addEventListener('click',handleReset);
+document.getElementById('draw-btn').addEventListener('click',handleDraw);
+document.getElementById('board-area').addEventListener('click',e=>{
+  if(e.target===e.currentTarget||e.target.id==='board-sets') closeHint();
+});
+document.getElementById('debug-toggle').addEventListener('click',()=>{
+  debugMode=!debugMode;
+  document.getElementById('debug-panel').classList.toggle('vis',debugMode);
+  document.getElementById('debug-toggle').style.color=debugMode?'orange':'rgba(255,165,0,.7)';
+  if(G) { dbg('Debug mode on','ok'); totalTileCount(); }
+});
+
+renderSetup();
+</script>
+</body>
 </html>
