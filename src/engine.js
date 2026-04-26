@@ -230,9 +230,8 @@ export function bestCombination(tiles) {
 
 // ── Linkable tiles: which hand+board tiles connect to a given tile ──
 // Returns Set of tile ids that are "linkable" to the selection
-export function findLinkableTiles(selectedIds, hand, board) {
+export function findLinkableTiles(selectedIds, allTiles) {
   if (!selectedIds.size) return new Set()
-  const allTiles = [...hand, ...board.flat()]
   const selected = allTiles.filter(t => selectedIds.has(t.id))
   const candidates = allTiles.filter(t => !selectedIds.has(t.id))
   const linked = new Set()
