@@ -2,12 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Board from './Board';
 import HandRack from './HandRack';
 import HintPanel from './HintPanel';
-import Tile from './Tile';
 import {
-  buildPool, sortHand, sortSet, tileVal, handVal,
-  isValid, isValidBoard, isRun,
-  findAllSets, bestCombination,
-  findExtensions, findJokerReplacements, findSplitInserts,
+  buildPool, sortSet, tileVal, handVal,
+  isValidBoard,
+  findAllSets,
+  findExtensions, findJokerReplacements,
   computeHints, applyHint, aiPlayTurn,
 } from '../utils/gameEngine';
 

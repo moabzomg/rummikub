@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback } from 'react';
 import Tile from './Tile';
 import { isValid, isRun } from '../utils/gameEngine';
 
@@ -17,9 +17,6 @@ export default function Board({
   onDragEnd,
   dragState,
 }) {
-  const dragOverSetRef = useRef(null);
-  const insertLineRefs = useRef({});
-
   const getSetLabel = (set) => {
     if (!isValid(set)) return '⚠ invalid';
     return isRun(set) ? 'run' : 'group';
