@@ -7,6 +7,7 @@ export default function Board({
   prevBoardIds,
   aiMovedIds,
   isHuman,
+  hasMeld,
   lastPlayedSets,
   debugMode,
   onDropOnSet,
@@ -15,12 +16,11 @@ export default function Board({
   onTileDblClick,
   onDragStart,
   onDragEnd,
-  dragState,
 }) {
-  const getSetLabel = (set) => {
-    if (!isValid(set)) return '⚠ invalid';
+  const getSetLabel = useCallback((set) => {
+    if (!isValid(set)) return 'invalid';
     return isRun(set) ? 'run' : 'group';
-  };
+  }, []);
 
   const highlightInsert = useCallback((setDiv, clientX) => {
     const inserts = setDiv.querySelectorAll('.drop-insert');
@@ -57,26 +57,29 @@ export default function Board({
         }
       }}
     >
-      <div className="last-turn-banner" id="lt-banner" style={{ display: 'none' }} />
-
       <div className="board-sets" id="board-sets">
         {board.map((set, si) => {
+          const isOriginalSet = si < prevBoardIds.size || [...set].every(t => prevBoardIds.has(t.id));
           const hasNewTile = set.some(t => !prevBoardIds.has(t.id));
           const isAiNew = hasNewTile && aiMovedIds.size > 0;
           const isLastPlayed = lastPlayedSets && lastPlayedSets.has(si);
+          // Before meld, existing board sets are locked (can't drop into them)
+          const isLocked = isHuman && !hasMeld && set.every(t => prevBoardIds.has(t.id));
 
           const cls = ['bset'];
           if (!isValid(set)) cls.push('invalid');
           if (isAiNew) cls.push('ai-new');
           if (isLastPlayed) cls.push('last-played');
+          if (isLocked) cls.push('locked');
 
           return (
             <div
               key={si}
               className={cls.join(' ')}
+              style={isLocked ? { opacity: 0.7, cursor: 'not-allowed' } : {}}
               onDragOver={e => {
+                if (!isHuman || isLocked) return;
                 e.preventDefault();
-                if (!isHuman) return;
                 e.currentTarget.classList.add('drop-target');
                 highlightInsert(e.currentTarget, e.clientX);
               }}
@@ -87,6 +90,7 @@ export default function Board({
                 }
               }}
               onDrop={e => {
+                if (isLocked) return;
                 e.preventDefault();
                 e.currentTarget.classList.remove('drop-target');
                 const pos = getInsertPos(e.currentTarget, set, e.clientX);
@@ -95,10 +99,7 @@ export default function Board({
               }}
             >
               <div className="bset-lbl">{getSetLabel(set)}</div>
-
-              {/* Before first tile */}
               <div className="drop-insert" data-si={si} data-pos={0} />
-
               {set.map((tile, ti) => (
                 <React.Fragment key={tile.id}>
                   <Tile
@@ -106,17 +107,25 @@ export default function Board({
                     src="board"
                     si={si}
                     ti={ti}
-                    isHuman={isHuman}
+                    isHuman={isHuman && !isLocked}
                     aiPlaced={aiMovedIds.has(tile.id)}
                     debugMode={debugMode}
                     onClickTile={onTileClick}
-                    onDblClickTile={onTileDblClick}
-                    onDragStart={onDragStart}
+                    onDblClickTile={isLocked ? undefined : onTileDblClick}
+                    onDragStart={isLocked ? undefined : onDragStart}
                     onDragEnd={onDragEnd}
                   />
                   <div className="drop-insert" data-si={si} data-pos={ti + 1} />
                 </React.Fragment>
               ))}
+              {isLocked && (
+                <div style={{
+                  position: 'absolute', inset: 0, borderRadius: '6px',
+                  background: 'rgba(0,0,0,.18)', cursor: 'not-allowed',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }} title="Meld first to use board tiles">
+                </div>
+              )}
             </div>
           );
         })}
@@ -126,7 +135,6 @@ export default function Board({
           onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
           onDragLeave={e => e.currentTarget.classList.remove('drag-over')}
           onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); onDropNewSet(); }}
-          onClick={() => {}}
         >
           + New Set
         </div>

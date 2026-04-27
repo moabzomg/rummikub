@@ -99,6 +99,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: #f0ede8
 .bset.invalid { border-color: var(--red); background: rgba(224,48,48,.07); }
 .bset.ai-new { border-color: #22c87a; background: rgba(34,200,122,.07); animation: aiGlow .6s ease-out; }
 .bset.last-played { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(244,196,48,.3); }
+.bset.locked { border-color: rgba(255,255,255,.04); opacity: .65; pointer-events: none; }
+.bset.locked .tile { cursor: not-allowed; }
 @keyframes aiGlow { 0% { box-shadow: 0 0 0 4px rgba(34,200,122,.5); } 100% { box-shadow: none; } }
 .bset-lbl { position: absolute; top: -8px; left: 7px; font-size: 8px; letter-spacing: 1px;
   text-transform: uppercase; color: rgba(255,255,255,.28); background: var(--felt); padding: 0 3px; }

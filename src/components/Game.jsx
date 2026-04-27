@@ -203,6 +203,13 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
   const dragStateRef = useRef({ active: false, tile: null, src: null, srcSi: null, ghost: null });
 
   const handleDragStart = useCallback((e, tile, src, si) => {
+    const g = gRef.current;
+    if (g) {
+      const pi = g.currentPlayer;
+      const hasMeld = g.hasMeld[pi];
+      // Before meld: cannot drag board tiles at all
+      if (!hasMeld && src === 'board') { e.preventDefault(); return; }
+    }
     dragStateRef.current = { active: true, tile, src, srcSi: si ?? null, ghost: null };
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('id', String(tile.id));
@@ -238,6 +245,19 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     if (!ds.tile) return;
     const g = gRef.current;
     if (!g) return;
+
+    // Before meld: can only drop onto sets that were created this turn (not original board sets)
+    const pi = g.currentPlayer;
+    const hasMeld = g.hasMeld[pi];
+    if (!hasMeld) {
+      // targetSi must be >= original board length (i.e. a new set started this turn)
+      if (targetSi < g.board.length) {
+        showToast('You must meld first before touching the board!');
+        dragStateRef.current.tile = null;
+        return;
+      }
+    }
+
     let ng = ensurePending(g);
 
     const tile = ds.tile;
@@ -331,21 +351,26 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     const hand = ng.pendingHand;
     const board = ng.pendingBoard;
 
-    const exts = findExtensions([tile], board);
-    if (exts.length > 0) {
-      const ext = exts[0];
-      ng.pendingHand = hand.filter(t => t.id !== tile.id);
-      if (ext.pos === 'start') board[ext.si] = sortSet([tile, ...board[ext.si]]);
-      else if (ext.pos === 'end') board[ext.si] = sortSet([...board[ext.si], tile]);
-      else board[ext.si] = sortSet([...board[ext.si].slice(0, ext.insertAt), tile, ...board[ext.si].slice(ext.insertAt)]);
-      setSelectedIds(prev => { const s = new Set(prev); s.delete(tile.id); return s; });
-      setG({ ...ng });
-      gRef.current = { ...ng };
-      setTimeout(() => {
-        const el = document.querySelector(`[data-id="${tile.id}"]`);
-        if (el) { el.classList.add('bounce'); setTimeout(() => el.classList.remove('bounce'), 350); }
-      }, 40);
-      return;
+    // Before meld: do not auto-extend existing board sets
+    const pi2 = g.currentPlayer;
+    const hasMeld2 = g.hasMeld[pi2];
+    if (hasMeld2) {
+      const exts = findExtensions([tile], board);
+      if (exts.length > 0) {
+        const ext = exts[0];
+        ng.pendingHand = hand.filter(t => t.id !== tile.id);
+        if (ext.pos === 'start') board[ext.si] = sortSet([tile, ...board[ext.si]]);
+        else if (ext.pos === 'end') board[ext.si] = sortSet([...board[ext.si], tile]);
+        else board[ext.si] = sortSet([...board[ext.si].slice(0, ext.insertAt), tile, ...board[ext.si].slice(ext.insertAt)]);
+        setSelectedIds(prev => { const s = new Set(prev); s.delete(tile.id); return s; });
+        setG({ ...ng });
+        gRef.current = { ...ng };
+        setTimeout(() => {
+          const el = document.querySelector(`[data-id="${tile.id}"]`);
+          if (el) { el.classList.add('bounce'); setTimeout(() => el.classList.remove('bounce'), 350); }
+        }, 40);
+        return;
+      }
     }
 
     const selTiles = [...selectedIds].map(id => hand.find(t => t.id === id)).filter(Boolean);
@@ -373,6 +398,8 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     const pi = g.currentPlayer;
     if (g.players[pi].type !== 'human') return;
     if (src === 'board') {
+      // Before meld, board tiles that were placed THIS turn can still be returned
+      // (returnTileToHand already guards against original board tiles)
       returnTileToHand(tile, si, g);
     } else {
       autoPlaceTile(tile, g);
@@ -546,6 +573,7 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
         prevBoardIds={prevBoardIds}
         aiMovedIds={aiMovedIds}
         isHuman={isHuman}
+        hasMeld={humanIdx >= 0 ? G.hasMeld[humanIdx] : true}
         lastPlayedSets={G.lastPlayedSets}
         debugMode={debugMode}
         onDropOnSet={handleDropOnSet}

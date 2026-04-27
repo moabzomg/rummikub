@@ -53,26 +53,83 @@ export function isValid(tiles) { return tiles.length>=3 && (isRun(tiles)||isGrou
 export function isValidBoard(sets) { return sets.every(s=>isValid(s)); }
 
 // ── SORT SET ──
+// Places jokers at their correct inferred positions within the set.
 export function sortSet(tiles) {
   const norm = tiles.filter(t=>!t.isJoker);
   const jokers = tiles.filter(t=>t.isJoker);
   if (!norm.length) return tiles;
   const cols = [...new Set(norm.map(t=>t.color))];
+
+  // ── RUN: assign jokers to gap positions ──
   if (cols.length === 1) {
     const sorted = [...norm].sort((a,b)=>a.num-b.num);
-    const out = [];
-    let ji=0;
-    for (let i=0;i<sorted.length;i++) {
-      if (i>0) {
-        const gap = sorted[i].num - sorted[i-1].num - 1;
-        for (let g=0;g<gap&&ji<jokers.length;g++,ji++) out.push(jokers[ji]);
-      }
-      out.push(sorted[i]);
+    const minNum = sorted[0].num;
+    const maxNum = sorted[sorted.length-1].num;
+    const totalLen = tiles.length; // norm + jokers must fill a contiguous run
+
+    // Determine the run's actual start: the run spans totalLen consecutive values.
+    // We try to find start such that all norm tiles fit in [start, start+totalLen-1]
+    // and jokers fill the gaps. Prefer start = minNum if jokers cover the head gaps,
+    // otherwise extend left.
+    let runStart = minNum;
+    const jokerCount = jokers.length;
+    // How many jokers would be needed to reach minNum from start?
+    // Gaps before minNum = minNum - runStart (0 if runStart===minNum)
+    // Total span from runStart = totalLen → runEnd = runStart + totalLen - 1
+    // Check if maxNum fits: maxNum <= runEnd
+    // And gaps filled by jokers = totalLen - norm.length = jokerCount ✓ (always true if isRun passed)
+    // Find the best start: if we can place jokers at beginning, do so.
+    // Strategy: runStart = minNum if extra jokers go at end, else shift left.
+    const gapsInMiddle = (maxNum - minNum + 1) - norm.length;
+    const jokersForHead = jokerCount - gapsInMiddle;
+    // Prefer trailing jokers (higher end) unless that exceeds 13, then push left
+    const runEndIfTrailing = maxNum + jokersForHead;
+    if (jokersForHead > 0 && runEndIfTrailing > 13) {
+      runStart = Math.max(1, minNum - jokersForHead);
+    } else {
+      runStart = minNum; // surplus jokers trail at end
     }
-    while (ji<jokers.length) out.push(jokers[ji++]);
+
+    // Build a slot array for [runStart .. runStart+totalLen-1]
+    const slots = [];
+    for (let n = runStart; n < runStart + totalLen; n++) slots.push(n);
+
+    // Fill slots: place norm tiles, jokers fill the rest in order
+    const out = [];
+    let ji = 0;
+    for (const n of slots) {
+      const normTile = norm.find(t => t.num === n);
+      if (normTile) {
+        out.push(normTile);
+      } else {
+        if (ji < jokers.length) out.push(jokers[ji++]);
+      }
+    }
     return out;
   }
-  return [...norm].sort((a,b)=>(COLOR_ORDER[a.color]||0)-(COLOR_ORDER[b.color]||0)).concat(jokers);
+
+  // ── GROUP: joker takes the missing color slot ──
+  // In a group all tiles share the same number; place joker in color order
+  const num = norm[0].num;
+  const presentColors = new Set(norm.map(t=>t.color));
+  const missingColors = COLORS.filter(c=>!presentColors.has(c));
+  // Build sorted list of all color slots occupied by this group
+  const colorSlots = [...norm].sort((a,b)=>(COLOR_ORDER[a.color]||0)-(COLOR_ORDER[b.color]||0));
+  // Insert jokers into missing color positions in color order
+  let ji = 0;
+  const result = [];
+  let ni = 0;
+  for (const c of COLORS) {
+    if (presentColors.has(c)) {
+      result.push(colorSlots[ni++]);
+    } else if (ji < jokers.length && missingColors.includes(c)) {
+      result.push(jokers[ji++]);
+    }
+  }
+  // If any norm tiles weren't placed (shouldn't happen), append them
+  while (ni < colorSlots.length) result.push(colorSlots[ni++]);
+  while (ji < jokers.length) result.push(jokers[ji++]);
+  return result;
 }
 
 // ── SORT HAND ──
