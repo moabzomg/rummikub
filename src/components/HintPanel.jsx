@@ -12,11 +12,21 @@ export default function HintPanel({ hints, onApply, onClose }) {
       <div className="hint-moves">
         {hints.map((hint, idx) => {
           const isBest = idx === 0 && hint.applicable;
-          const allT = [
-            ...hint.sets.flat(),
-            ...(hint.jrep ? [hint.jrep.handTile] : []),
-            ...(hint.tile && !hint.sets.flat().some(t => t.id === hint.tile?.id) ? [hint.tile] : []),
-          ];
+
+          // Build tile list with strict dedup by id — no tile should appear twice
+          const seen = new Set();
+          const allT = [];
+          const addTile = (t) => {
+            if (!t || seen.has(t.id)) return;
+            seen.add(t.id);
+            allT.push(t);
+          };
+
+          hint.sets.flat().forEach(addTile);
+          if (hint.jrep) addTile(hint.jrep.handTile);
+          if (hint.tile) addTile(hint.tile);
+          if (hint.splits) hint.splits.forEach(sp => addTile(sp.tile));
+          if (hint.exts) hint.exts.forEach(e => addTile(e.tile));
 
           return (
             <div
@@ -29,9 +39,9 @@ export default function HintPanel({ hints, onApply, onClose }) {
               </div>
               <div className="hm-desc">{hint.desc}</div>
               <div className="hm-tiles">
-                {allT.slice(0, 14).map((t, i) => (
-                  <div key={i} className={'mt c-' + t.color}>
-                    {t.isJoker ? '★' : t.num}
+                {allT.slice(0, 14).map((t) => (
+                  <div key={t.id} className={'mt c-' + t.color}>
+                    {t.isJoker ? '\u2605' : t.num}
                   </div>
                 ))}
               </div>
