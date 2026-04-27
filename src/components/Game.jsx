@@ -492,7 +492,13 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
   const pi = G.currentPlayer;
   const isHuman = G.players[pi].type === 'human';
   const board = G.pendingBoard || G.board;
-  const hand = G.pendingHand || G.hands[pi];
+
+  // Always find the human player index to keep their hand visible at all times
+  const humanIdx = G.players.findIndex(p => p.type === 'human');
+  const hand = humanIdx >= 0
+    ? (humanIdx === pi ? (G.pendingHand || G.hands[humanIdx]) : G.hands[humanIdx])
+    : [];
+
   const prevBoardIds = new Set(G.board.flat().map(t => t.id));
   const aiMovedIds = new Set(G.aiMoveLog || []);
 
@@ -509,11 +515,7 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
               {p.name}
               <span className="tc">{G.hands[i].length}</span>
               {!G.hasMeld[i] && <span style={{ color: '#f07070', fontSize: '8px' }}> no meld</span>}
-              {debugMode && p.type === 'ai' && (
-                <span style={{ fontSize: '8px', color: '#aaa', marginLeft: '4px' }}>
-                  [{G.hands[i].map(t => t.isJoker ? '\u2605' : `${t.num}${t.color[0].toUpperCase()}`).join(' ')}]
-                </span>
-              )}
+
             </div>
           ))}
         </div>
@@ -571,8 +573,8 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
           hand={hand}
           sortMode={sortMode}
           selectedIds={selectedIds}
-          hasMeld={G.hasMeld[pi]}
-          isHuman={isHuman}
+          hasMeld={humanIdx >= 0 ? G.hasMeld[humanIdx] : false}
+          isHuman={humanIdx === pi}
           debugMode={debugMode}
           onTileClick={handleTileClick}
           onTileDblClick={handleTileDblClick}
@@ -581,6 +583,24 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
           onPlaySuggestion={handlePlaySuggestion}
           onSortChange={setSortMode}
         />
+        {/* Debug: show other players' actual tiles */}
+        {debugMode && G.players.map((p, i) => {
+          if (p.type !== 'ai') return null;
+          return (
+            <div key={i} style={{ marginTop: '6px' }}>
+              <div className="hand-lbl" style={{ color: 'rgba(255,165,0,.7)' }}>
+                {p.name} ({G.hands[i].length} tiles) — debug
+              </div>
+              <div className="hand-rack" style={{ opacity: 0.75, pointerEvents: 'none' }}>
+                {G.hands[i].map((tile, ti) => (
+                  <div key={tile.id} className={'tile in-board c-' + tile.color} style={{ cursor: 'default' }}>
+                    <div className="t-num">{tile.isJoker ? '\u2605' : tile.num}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {hintPanelOpen && (
