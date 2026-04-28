@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useCallback } from 'react';
 import Tile from './Tile';
 import { sortHand, findAllSets, tileVal } from '../utils/gameEngine';
 
@@ -17,11 +17,11 @@ export default function HandRack({
 }) {
   const longPressRef = useRef(null);
   const longPressActiveRef = useRef(false);
-  const lassoRef = useRef({ active: false, anchor: null, lassoIds: new Set(), sweepInterval: null });
+  // Single lasso state — only ONE set raised at a time
+  const lassoRef = useRef({ lassoIds: new Set(), set: null, sweepInterval: null });
   const rackRef = useRef(null);
-  const [lassoSelectedIds, setLassoSelectedIds] = useState(new Set());
+  const [lassoIds, setLassoIds] = useState(new Set());
 
-  // sortHand now returns { tiles, playableCount, sets }
   const handKey = useMemo(() => hand.map(t => t.id).sort().join(','), [hand]);
   const { tiles: sorted, playableCount, sets: playableSets } = useMemo(
     () => sortHand(hand, sortMode),
@@ -31,7 +31,6 @@ export default function HandRack({
   const playable = sorted.slice(0, playableCount);
   const rest = sorted.slice(playableCount);
 
-  // For suggestion strip — use sets directly from sortHand (already best combo, no recompute)
   const allSets = useMemo(() => findAllSets(sorted), [handKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const sortedSuggestions = useMemo(() =>
     [...allSets]
@@ -39,74 +38,105 @@ export default function HandRack({
       .slice(0, 8),
   [allSets]);
 
-  // ── LASSO ──
-  const clearLasso = () => {
+  // ── LASSO helpers ──
+  const clearLasso = useCallback(() => {
     clearInterval(lassoRef.current.sweepInterval);
-    if (rackRef.current) {
-      rackRef.current.querySelectorAll('.lasso').forEach(el => el.classList.remove('lasso'));
-    }
-    lassoRef.current = { active: false, anchor: null, lassoIds: new Set(), sweepInterval: null };
+    lassoRef.current = { lassoIds: new Set(), set: null, sweepInterval: null };
     longPressActiveRef.current = false;
-    setLassoSelectedIds(new Set());
-  };
+    setLassoIds(new Set());
+  }, []);
 
-  const startLasso = (tile) => {
+  const startLasso = useCallback((tile) => {
     if (!isHuman) return;
     clearTimeout(longPressRef.current);
 
     longPressRef.current = setTimeout(() => {
+      // Always clear any previous lasso first — only ONE set at a time
+      clearInterval(lassoRef.current.sweepInterval);
+      setLassoIds(new Set());
+
       longPressActiveRef.current = true;
 
-      // Find which playable set this tile belongs to
+      // Find the specific playable set this tile belongs to
       const owningSet = playableSets.find(s => s.some(t => t.id === tile.id));
-      // Only lasso that specific set — not all linkable tiles
-      const lassoGroup = owningSet
-        ? owningSet.filter(t => t.id !== tile.id)  // rest of the same set
-        : [];                                        // tile not in any set — no lasso
+      if (!owningSet) {
+        // Tile not in any set — no lasso
+        longPressActiveRef.current = false;
+        return;
+      }
 
-      const ids = new Set([tile.id, ...lassoGroup.map(t => t.id)]);
-      lassoRef.current = { active: true, anchor: tile, lassoIds: ids, sweepInterval: null };
+      // Build the lasso group in display order (anchor first, rest follow)
+      const restOfSet = owningSet.filter(t => t.id !== tile.id);
+      const ids = new Set([tile.id, ...restOfSet.map(t => t.id)]);
+      lassoRef.current = { lassoIds: ids, set: owningSet, sweepInterval: null };
 
-      // Animate: raise anchor immediately, then sweep group members
-      setLassoSelectedIds(new Set([tile.id]));
-      const anchorEl = rackRef.current && rackRef.current.querySelector(`[data-id="${tile.id}"]`);
-      if (anchorEl) anchorEl.classList.add('lasso');
+      // Raise anchor tile immediately
+      setLassoIds(new Set([tile.id]));
 
+      // Sweep remaining tiles of the set with animation
       let i = 0;
       const sweep = setInterval(() => {
-        if (i >= lassoGroup.length) {
+        if (i >= restOfSet.length) {
           clearInterval(sweep);
-          setLassoSelectedIds(new Set(ids));
+          setLassoIds(new Set(ids));
           return;
         }
-        const t = lassoGroup[i];
-        const el = rackRef.current && rackRef.current.querySelector(`[data-id="${t.id}"]`);
-        if (el) el.classList.add('lasso');
-        setLassoSelectedIds(prev => new Set([...prev, t.id]));
+        setLassoIds(prev => new Set([...prev, restOfSet[i].id]));
         i++;
-      }, 100);
+      }, 90);
       lassoRef.current.sweepInterval = sweep;
     }, 400);
-  };
+  }, [isHuman, playableSets]);
 
-  const endLasso = () => {
+  const endLasso = useCallback(() => {
     clearTimeout(longPressRef.current);
-    if (!longPressActiveRef.current) return;
-    longPressActiveRef.current = false;
-    lassoRef.current.active = false;
-    // Keep lasso selection raised — click to dismiss
-  };
+    // Don't clear lasso on pointer-up — keep raised until click or drag
+  }, []);
 
-  const handleClickWithLasso = (e, tile, src, si) => {
-    if (lassoRef.current.lassoIds.has(tile.id)) {
+  // Click on a lassoed tile: play the whole set, then clear lasso
+  // Click on a non-lassoed tile: normal click (clear lasso first)
+  const handleClick = useCallback((e, tile, src, si) => {
+    const inLasso = lassoRef.current.lassoIds.has(tile.id);
+    if (inLasso && lassoRef.current.set) {
+      // One-click play: pass the lasso set to onPlaySuggestion
+      const setToPlay = lassoRef.current.set;
+      const v = setToPlay.reduce((s, t) => s + tileVal(t), 0);
+      const canPlay = hasMeld || v >= 30;
+      clearLasso();
+      if (canPlay) {
+        onPlaySuggestion && onPlaySuggestion(setToPlay);
+      }
+      return;
+    }
+    // Clicking outside lasso clears it first
+    if (lassoRef.current.lassoIds.size > 0) {
       clearLasso();
       return;
     }
     onTileClick && onTileClick(e, tile, src, si);
-  };
+  }, [hasMeld, clearLasso, onPlaySuggestion, onTileClick]);
+
+  // Drag start on a lassoed tile: play the whole set (drag = commit the group)
+  const handleDragStart = useCallback((e, tile, src, si) => {
+    if (lassoRef.current.lassoIds.has(tile.id) && lassoRef.current.set) {
+      // Treat drag on lasso group as playing the whole set
+      const setToPlay = lassoRef.current.set;
+      const v = setToPlay.reduce((s, t) => s + tileVal(t), 0);
+      const canPlay = hasMeld || v >= 30;
+      clearLasso();
+      if (canPlay) {
+        e.preventDefault(); // cancel the drag
+        onPlaySuggestion && onPlaySuggestion(setToPlay);
+      } else {
+        e.preventDefault();
+      }
+      return;
+    }
+    onDragStart && onDragStart(e, tile, src, si);
+  }, [hasMeld, clearLasso, onPlaySuggestion, onDragStart]);
 
   const renderTile = (tile, i) => {
-    const isLassoRaised = lassoSelectedIds.has(tile.id);
+    const isRaised = lassoIds.has(tile.id);
     return (
       <div
         key={tile.id}
@@ -114,23 +144,24 @@ export default function HandRack({
           display: 'inline-flex',
           flexDirection: 'column',
           alignItems: 'center',
-          transition: 'transform 0.18s ease',
-          transform: isLassoRaised ? 'translateY(-10px)' : 'translateY(0)',
+          transition: 'transform 0.15s ease',
+          transform: isRaised ? 'translateY(-12px)' : 'translateY(0)',
+          cursor: isRaised ? 'pointer' : undefined,
         }}
         onPointerDown={() => startLasso(tile)}
         onPointerUp={endLasso}
-        onPointerLeave={() => { clearTimeout(longPressRef.current); if (!longPressActiveRef.current) return; }}
+        onPointerLeave={() => clearTimeout(longPressRef.current)}
       >
         <Tile
           tile={tile}
           src="hand"
           ti={i}
-          selected={selectedIds.has(tile.id) || isLassoRaised}
+          selected={selectedIds.has(tile.id) || isRaised}
           isHuman={isHuman}
           debugMode={debugMode}
-          onClickTile={handleClickWithLasso}
+          onClickTile={handleClick}
           onDblClickTile={onTileDblClick}
-          onDragStart={onDragStart}
+          onDragStart={handleDragStart}
           onDragEnd={onDragEnd}
         />
       </div>
