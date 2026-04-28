@@ -59,7 +59,6 @@ export default function Board({
     >
       <div className="board-sets" id="board-sets">
         {board.map((set, si) => {
-          const isOriginalSet = si < prevBoardIds.size || [...set].every(t => prevBoardIds.has(t.id));
           const hasNewTile = set.some(t => !prevBoardIds.has(t.id));
           const isAiNew = hasNewTile && aiMovedIds.size > 0;
           const isLastPlayed = lastPlayedSets && lastPlayedSets.has(si);
