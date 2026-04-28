@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import Tile from './Tile';
 import { sortHand, findAllSets, tileVal } from '../utils/gameEngine';
 
@@ -43,11 +43,22 @@ export default function HandRack({
   // Local lasso selection state — lifted tiles (raised visually)
   const [lassoSelectedIds, setLassoSelectedIds] = useState(new Set());
 
-  const sorted = sortHand(hand, sortMode);
-  const allSets = findAllSets(sorted);
-  const playableIds = new Set(allSets.flat().map(t => t.id));
-  const playable = sorted.filter(t => playableIds.has(t.id));
-  const rest = sorted.filter(t => !playableIds.has(t.id));
+  const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
+
+  // findAllSets is expensive — only recompute when hand tiles actually change
+  const handKey = useMemo(() => hand.map(t => t.id).sort().join(','), [hand]);
+  const allSets = useMemo(() => findAllSets(sorted), [handKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // sortHand already puts playable set tiles first; use bestCombination count to find separator
+  const playableIds = useMemo(() => new Set(allSets.flat().map(t => t.id)), [allSets]);
+  // sorted is already: [set1tiles, set2tiles, ..., rest] — find where playable ends
+  const playableCutoff = useMemo(() => {
+    let i = 0;
+    while (i < sorted.length && playableIds.has(sorted[i].id)) i++;
+    return i;
+  }, [sorted, playableIds]);
+  const playable = useMemo(() => sorted.slice(0, playableCutoff), [sorted, playableCutoff]);
+  const rest = useMemo(() => sorted.slice(playableCutoff), [sorted, playableCutoff]);
 
   const clearLasso = () => {
     // Remove lasso classes from DOM
@@ -111,9 +122,11 @@ export default function HandRack({
     onTileClick && onTileClick(e, tile, src, si);
   };
 
-  const sortedSets = [...allSets]
-    .sort((a, b) => b.length - a.length || b.reduce((s, t) => s + tileVal(t), 0) - a.reduce((s, t) => s + tileVal(t), 0))
-    .slice(0, 10);
+  const sortedSets = useMemo(() =>
+    [...allSets]
+      .sort((a, b) => b.length - a.length || b.reduce((s, t) => s + tileVal(t), 0) - a.reduce((s, t) => s + tileVal(t), 0))
+      .slice(0, 8),
+  [allSets]);
 
   const renderTile = (tile, i) => {
     const isLassoRaised = lassoSelectedIds.has(tile.id);

@@ -87,13 +87,34 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: #f0ede8
   position: relative; min-height: 0;
   background-image: radial-gradient(circle at 15% 15%, rgba(255,255,255,.025), transparent 55%),
     radial-gradient(circle at 85% 85%, rgba(0,0,0,.08), transparent 55%); }
-.board-sets { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;
-  min-height: 100%; padding-bottom: 8px; }
+.board-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-content: flex-start;
+  align-items: flex-start;
+  min-height: 100%;
+  padding-bottom: 8px;
+}
 
-.bset { display: flex; flex-direction: row; gap: 2px; padding: 7px 9px;
-  background: rgba(0,0,0,.22); border: 2px solid rgba(255,255,255,.07);
-  border-radius: var(--r); position: relative; align-items: center;
-  min-width: 56px; min-height: 68px; transition: border-color .13s, background .13s; cursor: default; }
+.bset {
+  display: flex;
+  flex-direction: row;
+  gap: 3px;
+  padding: 8px 10px 8px 10px;
+  background: rgba(0,0,0,.28);
+  border: 2px solid rgba(255,255,255,.08);
+  border-radius: var(--r);
+  position: relative;
+  align-items: center;
+  min-width: 50px;
+  min-height: 68px;
+  transition: border-color .13s, background .13s;
+  cursor: default;
+  /* each set stands alone — no merging with neighbours */
+  flex-shrink: 0;
+  width: fit-content;
+}
 .bset.drop-target { border-color: var(--gold); background: rgba(244,196,48,.07);
   box-shadow: 0 0 0 2px rgba(244,196,48,.25); }
 .bset.invalid { border-color: var(--red); background: rgba(224,48,48,.07); }
