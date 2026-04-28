@@ -114,7 +114,6 @@ export function sortSet(tiles) {
 
   // ── GROUP: joker takes the missing color slot ──
   // In a group all tiles share the same number; place joker in color order
-  const num = norm[0] ? norm[0].num : 0;
   const presentColors = new Set(norm.map(t=>t.color));
   const missingColors = COLORS.filter(c=>!presentColors.has(c));
   // Build sorted list of all color slots occupied by this group
@@ -137,15 +136,17 @@ export function sortSet(tiles) {
 }
 
 // ── SORT HAND ──
-// Playable sets are grouped first (each set kept together), then remaining tiles sorted.
+// Returns { tiles: Tile[], playableCount: number, sets: Tile[][] }
+// Playable sets come first (each set kept together), then remaining tiles sorted by mode.
 export function sortHand(hand, mode) {
   const combo = bestCombination(hand);
-  const setGroups = combo.sets; // array of arrays, each a valid set
+  const setGroups = combo.sets; // each element is one valid set (no tile appears twice across sets)
   const usedIds = new Set(setGroups.flat().map(t=>t.id));
   const remaining = hand.filter(t=>!usedIds.has(t.id));
 
-  // Sort within each set correctly
+  // Sort each set internally into correct order
   const sortedGroups = setGroups.map(s => sortSet(s));
+  const playableFlat = sortedGroups.flat();
 
   // Sort remaining tiles by user preference
   const sortedRest = [...remaining].sort((a,b) => {
@@ -159,8 +160,11 @@ export function sortHand(hand, mode) {
     return a.num !== b.num ? a.num-b.num : (COLOR_ORDER[a.color]||0)-(COLOR_ORDER[b.color]||0);
   });
 
-  // Flatten: sets first (each set contiguous), then rest
-  return [...sortedGroups.flat(), ...sortedRest];
+  return {
+    tiles: [...playableFlat, ...sortedRest],
+    playableCount: playableFlat.length,
+    sets: sortedGroups,        // each set as its own array, in display order
+  };
 }
 
 // ── JOKER INFERENCE ──
@@ -221,7 +225,6 @@ export function findJokerReplacements(hand, board) {
 export function findAllSets(tiles) {
   const capped = tiles.slice(0, 16);
   const result = [];
-  const n = capped.length;
   // Build runs: group by color, find consecutive number sequences
   const byColor = {};
   for (const t of capped) {
@@ -251,10 +254,6 @@ export function findAllSets(tiles) {
       }
       // Also try joker at start
       if (jokers.length > 0) {
-        const runWithHead = [jokers[0], sorted[start]];
-        if (start + 1 < sorted.length && sorted[start+1].num === sorted[start].num + 2) {
-          // joker fills gap between start and start+1
-        }
         // joker prefix: ★, sorted[start], sorted[start+1]...
         for (let end = start; end < sorted.length - 1; end++) {
           const r2 = [jokers[0], sorted[end], sorted[end+1]];

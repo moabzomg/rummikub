@@ -2,27 +2,6 @@ import React, { useRef, useState, useMemo } from 'react';
 import Tile from './Tile';
 import { sortHand, findAllSets, tileVal } from '../utils/gameEngine';
 
-// Find tiles that can link with anchor to form a run or group
-function findLinkable(anchor, allTiles) {
-  if (anchor.isJoker) return allTiles.filter(t => t.id !== anchor.id);
-  const linked = new Set();
-
-  for (const candidate of allTiles) {
-    if (candidate.id === anchor.id) continue;
-    // Test group: same number, different colour
-    if (!candidate.isJoker && candidate.num === anchor.num && candidate.color !== anchor.color) {
-      linked.add(candidate.id);
-      continue;
-    }
-    // Test run: same colour (or joker), adjacent/near number
-    if (candidate.isJoker || candidate.color === anchor.color) {
-      const diff = candidate.isJoker ? 1 : Math.abs(candidate.num - anchor.num);
-      if (diff >= 1 && diff <= 4) linked.add(candidate.id); // within run-building distance
-    }
-  }
-  return allTiles.filter(t => linked.has(t.id));
-}
-
 export default function HandRack({
   hand,
   sortMode,
@@ -38,34 +17,35 @@ export default function HandRack({
 }) {
   const longPressRef = useRef(null);
   const longPressActiveRef = useRef(false);
-  const lassoRef = useRef({ active: false, anchor: null, lassoIds: new Set() });
+  const lassoRef = useRef({ active: false, anchor: null, lassoIds: new Set(), sweepInterval: null });
   const rackRef = useRef(null);
-  // Local lasso selection state — lifted tiles (raised visually)
   const [lassoSelectedIds, setLassoSelectedIds] = useState(new Set());
 
-  const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
-
-  // findAllSets is expensive — only recompute when hand tiles actually change
+  // sortHand now returns { tiles, playableCount, sets }
   const handKey = useMemo(() => hand.map(t => t.id).sort().join(','), [hand]);
+  const { tiles: sorted, playableCount, sets: playableSets } = useMemo(
+    () => sortHand(hand, sortMode),
+    [handKey, sortMode] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const playable = sorted.slice(0, playableCount);
+  const rest = sorted.slice(playableCount);
+
+  // For suggestion strip — use sets directly from sortHand (already best combo, no recompute)
   const allSets = useMemo(() => findAllSets(sorted), [handKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sortedSuggestions = useMemo(() =>
+    [...allSets]
+      .sort((a, b) => b.length - a.length || b.reduce((s, t) => s + tileVal(t), 0) - a.reduce((s, t) => s + tileVal(t), 0))
+      .slice(0, 8),
+  [allSets]);
 
-  // sortHand already puts playable set tiles first; use bestCombination count to find separator
-  const playableIds = useMemo(() => new Set(allSets.flat().map(t => t.id)), [allSets]);
-  // sorted is already: [set1tiles, set2tiles, ..., rest] — find where playable ends
-  const playableCutoff = useMemo(() => {
-    let i = 0;
-    while (i < sorted.length && playableIds.has(sorted[i].id)) i++;
-    return i;
-  }, [sorted, playableIds]);
-  const playable = useMemo(() => sorted.slice(0, playableCutoff), [sorted, playableCutoff]);
-  const rest = useMemo(() => sorted.slice(playableCutoff), [sorted, playableCutoff]);
-
+  // ── LASSO ──
   const clearLasso = () => {
-    // Remove lasso classes from DOM
+    clearInterval(lassoRef.current.sweepInterval);
     if (rackRef.current) {
       rackRef.current.querySelectorAll('.lasso').forEach(el => el.classList.remove('lasso'));
     }
-    lassoRef.current = { active: false, anchor: null, lassoIds: new Set() };
+    lassoRef.current = { active: false, anchor: null, lassoIds: new Set(), sweepInterval: null };
     longPressActiveRef.current = false;
     setLassoSelectedIds(new Set());
   };
@@ -73,60 +53,57 @@ export default function HandRack({
   const startLasso = (tile) => {
     if (!isHuman) return;
     clearTimeout(longPressRef.current);
+
     longPressRef.current = setTimeout(() => {
       longPressActiveRef.current = true;
-      const linkable = findLinkable(tile, sorted);
-      lassoRef.current = { active: true, anchor: tile, lassoIds: new Set() };
 
-      // Sweep through linkable tiles one by one with animation
+      // Find which playable set this tile belongs to
+      const owningSet = playableSets.find(s => s.some(t => t.id === tile.id));
+      // Only lasso that specific set — not all linkable tiles
+      const lassoGroup = owningSet
+        ? owningSet.filter(t => t.id !== tile.id)  // rest of the same set
+        : [];                                        // tile not in any set — no lasso
+
+      const ids = new Set([tile.id, ...lassoGroup.map(t => t.id)]);
+      lassoRef.current = { active: true, anchor: tile, lassoIds: ids, sweepInterval: null };
+
+      // Animate: raise anchor immediately, then sweep group members
+      setLassoSelectedIds(new Set([tile.id]));
+      const anchorEl = rackRef.current && rackRef.current.querySelector(`[data-id="${tile.id}"]`);
+      if (anchorEl) anchorEl.classList.add('lasso');
+
       let i = 0;
       const sweep = setInterval(() => {
-        if (!lassoRef.current.active || i >= linkable.length) {
+        if (i >= lassoGroup.length) {
           clearInterval(sweep);
-          // Finalize lasso selection
-          const ids = new Set([tile.id, ...linkable.map(t => t.id)]);
-          lassoRef.current.lassoIds = ids;
           setLassoSelectedIds(new Set(ids));
           return;
         }
-        const t = linkable[i];
+        const t = lassoGroup[i];
         const el = rackRef.current && rackRef.current.querySelector(`[data-id="${t.id}"]`);
         if (el) el.classList.add('lasso');
+        setLassoSelectedIds(prev => new Set([...prev, t.id]));
         i++;
       }, 100);
-
-      // Also immediately raise the anchor tile
-      const anchorEl = rackRef.current && rackRef.current.querySelector(`[data-id="${tile.id}"]`);
-      if (anchorEl) anchorEl.classList.add('lasso');
+      lassoRef.current.sweepInterval = sweep;
     }, 400);
   };
 
   const endLasso = () => {
     clearTimeout(longPressRef.current);
-    if (!longPressActiveRef.current) {
-      // Short press — not a lasso, don't clear selection
-      return;
-    }
-    // Keep lasso selection visible after release
+    if (!longPressActiveRef.current) return;
     longPressActiveRef.current = false;
     lassoRef.current.active = false;
+    // Keep lasso selection raised — click to dismiss
   };
 
-  // Clicking a tile clears lasso selection if it's part of the lasso group
   const handleClickWithLasso = (e, tile, src, si) => {
     if (lassoRef.current.lassoIds.has(tile.id)) {
-      // Click returns tile to original position (clears lasso)
       clearLasso();
       return;
     }
     onTileClick && onTileClick(e, tile, src, si);
   };
-
-  const sortedSets = useMemo(() =>
-    [...allSets]
-      .sort((a, b) => b.length - a.length || b.reduce((s, t) => s + tileVal(t), 0) - a.reduce((s, t) => s + tileVal(t), 0))
-      .slice(0, 8),
-  [allSets]);
 
   const renderTile = (tile, i) => {
     const isLassoRaised = lassoSelectedIds.has(tile.id);
@@ -142,7 +119,7 @@ export default function HandRack({
         }}
         onPointerDown={() => startLasso(tile)}
         onPointerUp={endLasso}
-        onPointerLeave={() => { clearTimeout(longPressRef.current); longPressActiveRef.current = false; }}
+        onPointerLeave={() => { clearTimeout(longPressRef.current); if (!longPressActiveRef.current) return; }}
       >
         <Tile
           tile={tile}
@@ -162,9 +139,9 @@ export default function HandRack({
 
   return (
     <div>
-      {isHuman && sortedSets.length > 0 && (
+      {isHuman && sortedSuggestions.length > 0 && (
         <div className="sugg-strip">
-          {sortedSets.map((set, idx) => {
+          {sortedSuggestions.map((set, idx) => {
             const v = set.reduce((s, t) => s + tileVal(t), 0);
             const canPlay = hasMeld || v >= 30;
             return (
