@@ -15,7 +15,7 @@ export default function HintPanel({ hints, onApply, onClose }) {
   if (!hints || !hints.length) return null;
 
   return (
-    <div className="hint-panel vis">
+    <div className="hint-panel">
       <div className="hint-hdr">
         <div className="hint-title">💡 BEST MOVES</div>
         <button className="hint-close" onClick={onClose}>✕</button>

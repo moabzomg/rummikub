@@ -4,10 +4,9 @@ import Board from './Board';
 import HandRack from './HandRack';
 import HintPanel from './HintPanel';
 import {
-  buildPool, sortSet, tileVal, handVal,
+  buildPool, sortSet, sortHand, tileVal, handVal,
   isValidBoard,
   findAllSets,
-  findExtensions,
   computeHints, applyHint, aiPlayTurn,
 } from '../utils/gameEngine';
 
@@ -45,6 +44,7 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
   const [aiRunning, setAiRunning] = useState(false);
   const [aiLabel, setAiLabel] = useState('');
   const [gameOver, setGameOver] = useState(null);
+  const [roundScores, setRoundScores] = useState(null); // accumulated across rounds
 
   const toastTimerRef = useRef(null);
   const aiRef = useRef(false);
@@ -77,16 +77,25 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
   const runAITurnRef = useRef(null);
 
   endGameRef.current = (g, winnerIdx) => {
-    const scores = g.players.map((p, i) => ({
-      name: p.name,
-      val: handVal(g.hands[i]),
-      cnt: g.hands[i].length,
-    }));
+    const handVals = g.players.map((p, i) => handVal(g.hands[i]));
     let wi = winnerIdx;
     if (wi < 0) {
-      const min = Math.min(...scores.map(s => s.val));
-      wi = scores.findIndex(s => s.val === min);
+      const min = Math.min(...handVals);
+      wi = handVals.findIndex(v => v === min);
     }
+    // Winner earns +sum of all other players' tile values
+    const winnerGain = handVals.reduce((s, v, i) => i !== wi ? s + v : s, 0);
+    const scores = g.players.map((p, i) => ({
+      name: p.name,
+      roundDelta: i === wi ? winnerGain : -handVals[i],
+      handVal: handVals[i],
+      cnt: g.hands[i].length,
+      isWinner: i === wi,
+    }));
+    setRoundScores(prev => {
+      const base = prev || g.players.map(() => 0);
+      return base.map((v, i) => v + scores[i].roundDelta);
+    });
     setGameOver({ winner: g.players[wi], scores });
   };
 
@@ -630,15 +639,18 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
         {/* Debug: show other players' actual tiles */}
         {debugMode && G.players.map((p, i) => {
           if (p.type !== 'ai') return null;
+          // Sort AI hand by strategy
+          let aiSorted = G.hands[i];
+          try { const r = sortHand(G.hands[i], 'color'); aiSorted = r.tiles || G.hands[i]; } catch {}
           return (
-            <div key={i} style={{ marginTop: '6px' }}>
+            <div key={i} style={{ padding: '4px 10px 6px' }}>
               <div className="hand-lbl" style={{ color: 'rgba(255,165,0,.7)' }}>
                 {p.name} ({G.hands[i].length} tiles) — debug
               </div>
-              <div className="hand-rack" style={{ opacity: 0.75, pointerEvents: 'none' }}>
-                {G.hands[i].map((tile, ti) => (
+              <div className="hand-rack" style={{ opacity: 0.78, pointerEvents: 'none', minHeight: '44px' }}>
+                {(aiSorted || G.hands[i]).map((tile) => tile && (
                   <div key={tile.id} className={'tile in-board c-' + tile.color} style={{ cursor: 'default' }}>
-                    <div className="t-num">{tile.isJoker ? '\u2605' : tile.num}</div>
+                    {tile.isJoker ? <div className="joker-face">☺</div> : <div className="t-num">{tile.num}</div>}
                   </div>
                 ))}
               </div>
@@ -648,28 +660,59 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
       </div>
 
       {hintPanelOpen && (
-        <HintPanel hints={hints} onApply={handleApplyHint} onClose={() => setHintPanelOpen(false)} />
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
+          background: 'rgba(5,12,28,.97)', borderTop: '2px solid var(--gold)',
+          maxHeight: '45vh', overflow: 'auto' }}>
+          <HintPanel hints={hints} onApply={handleApplyHint} onClose={() => setHintPanelOpen(false)} />
+        </div>
       )}
 
       {toast && <div className={`toast vis ${toast.type || 'error'}`}>{toast.msg}</div>}
 
       {gameOver && (
         <div className="win-screen vis">
-          <div className="win-title">WINNER!</div>
-          <div className="win-sub">{gameOver.winner.name} wins!</div>
+          <div className="win-title">🏆 {gameOver.winner.name} Wins!</div>
+          <div className="win-sub">Round Result</div>
           <div className="score-tbl">
-            {[...gameOver.scores].sort((a, b) => a.val - b.val).map((s, i) => (
+            {[...gameOver.scores].sort((a, b) => (b.isWinner ? 1 : -1)).map((s, i) => (
               <div key={i} className="score-row">
-                <span className="sr-pos">{i + 1}.</span>
+                <span className="sr-pos">{s.isWinner ? '🥇' : `${i+1}.`}</span>
                 <span>{s.name}</span>
-                <span>{s.cnt} tiles</span>
-                <span style={{ color: i === 0 ? '#f4c430' : 'rgba(255,255,255,.5)' }}>-{s.val}pts</span>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,.4)' }}>{s.cnt} tiles</span>
+                <span style={{ color: s.isWinner ? '#f4c430' : '#f08080', fontWeight: 600 }}>
+                  {s.isWinner ? `+${s.roundDelta}` : `${s.roundDelta}`}pts
+                </span>
               </div>
             ))}
           </div>
-          <button className="btn" style={{ marginTop: '14px', padding: '10px 28px', fontSize: '14px' }} onClick={onReturnToMenu}>
-            Play Again
-          </button>
+          {roundScores && (
+            <div className="score-tbl" style={{ marginTop: '8px' }}>
+              <div style={{ fontSize: '9px', letterSpacing: '2px', color: 'rgba(255,255,255,.35)', marginBottom: '5px' }}>TOTAL SCORES</div>
+              {G.players.map((p, i) => (
+                <div key={i} className="score-row">
+                  <span style={{ width: '22px', color: 'var(--gold)' }}>{i+1}.</span>
+                  <span>{p.name}</span>
+                  <span style={{ color: roundScores[i] >= 0 ? '#22c87a' : '#f08080', fontWeight: 600 }}>
+                    {roundScores[i] > 0 ? '+' : ''}{roundScores[i]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+            <button className="btn btn-green" style={{ padding: '10px 22px', fontSize: '13px' }}
+              onClick={() => {
+                const g = initGame(gRef.current.players);
+                setG(g); gRef.current = g;
+                setGameOver(null); setSelectedIds(new Set()); setHintPanelOpen(false);
+              }}>
+              Next Round
+            </button>
+            <button className="btn" style={{ padding: '10px 22px', fontSize: '13px' }}
+              onClick={() => { setRoundScores(null); onReturnToMenu(); }}>
+              Main Menu
+            </button>
+          </div>
         </div>
       )}
     </div>
