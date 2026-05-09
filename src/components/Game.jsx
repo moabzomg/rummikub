@@ -463,6 +463,22 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     if (takenFromBoard.length > 0) { showToast('Cannot take tiles from board back to hand!'); return; }
 
     if (!g.hasMeld[pi]) {
+      // Before meld: every set on the pending board that contains any new tile
+      // must consist ENTIRELY of new tiles (no mixing with original board tiles).
+      const originalBoardLen = g.board.length;
+      for (let si = 0; si < nb.length; si++) {
+        const set = nb[si];
+        const hasNew = set.some(t => !prevBoardIds.has(t.id));
+        const hasOld = set.some(t => prevBoardIds.has(t.id));
+        if (hasNew && hasOld) {
+          showToast('Initial meld must use only your own tiles — no adding to existing sets!');
+          return;
+        }
+        if (si < originalBoardLen && hasNew) {
+          showToast('Initial meld must use only your own tiles — no adding to existing sets!');
+          return;
+        }
+      }
       const placedTiles = g.hands[pi].filter(t => placed.includes(t.id));
       const v = placedTiles.reduce((s, t) => s + tileVal(t), 0);
       if (v < 30) { showToast(`Initial meld needs 30+ pts. You placed ${v} pts.`); return; }
@@ -588,13 +604,13 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
         <div className="action-bar">
           <div className="turn-info">{G.players[pi].name}'s Turn</div>
           <div className="sort-ctrl">
-            <button className={`sort-btn${sortMode === 'color' ? ' on' : ''}`} onClick={() => setSortMode('color')}>Color</button>
-            <button className={`sort-btn${sortMode === 'num' ? ' on' : ''}`} onClick={() => setSortMode('num')}>Number</button>
+            <button className={`sort-btn${sortMode === 'color' ? ' on' : ''}`} onClick={() => setSortMode('color')}>🎨 Color</button>
+            <button className={`sort-btn${sortMode === 'num' ? ' on' : ''}`} onClick={() => setSortMode('num')}>🔢 Num</button>
           </div>
-          <button className="btn btn-gold" onClick={handleShowHint} disabled={!isHuman}>Hint</button>
-          <button className="btn" onClick={handleReset} disabled={!isHuman}>Reset</button>
+          <button className="btn btn-gold" onClick={handleShowHint} disabled={!isHuman}>💡 Hint</button>
+          <button className="btn" onClick={handleReset} disabled={!isHuman}>↺</button>
           <button className="btn btn-red" onClick={handleDraw} disabled={!isHuman}>Draw</button>
-          <button className="btn btn-green" onClick={handleConfirm} disabled={!isHuman}>Confirm</button>
+          <button className="btn btn-green" onClick={handleConfirm} disabled={!isHuman}>✓ OK</button>
         </div>
 
         <HandRack

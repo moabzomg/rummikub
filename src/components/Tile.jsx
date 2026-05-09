@@ -1,10 +1,10 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useCallback } from 'react';
 
 export default function Tile({
   tile,
-  src,             // 'hand' | 'board'
-  si,              // set index (board only)
-  ti,              // tile index
+  src,
+  si,
+  ti,
   selected,
   highlighted,
   aiPlaced,
@@ -14,34 +14,15 @@ export default function Tile({
   onDblClickTile,
   onDragStart,
   onDragEnd,
-  showColor,       // show color label
 }) {
-  const longPressRef = useRef(null);
-  const longPressActiveRef = useRef(false);
-
   const cls = ['tile', 'c-' + tile.color];
   if (src === 'board') cls.push('in-board');
-  if (selected) cls.push('selected');
+  if (selected)    cls.push('selected');
   if (highlighted) cls.push('hint-highlight');
-  if (aiPlaced) cls.push('ai-placed');
-  if (!isHuman) cls.push('no-cursor');
-
-  const handlePointerDown = useCallback((e) => {
-    if (!isHuman || src !== 'hand') return;
-    longPressActiveRef.current = false;
-    longPressRef.current = setTimeout(() => {
-      longPressActiveRef.current = true;
-    }, 380);
-  }, [isHuman, src]);
-
-  const handlePointerUp = useCallback(() => {
-    clearTimeout(longPressRef.current);
-    longPressActiveRef.current = false;
-  }, []);
+  if (aiPlaced)    cls.push('ai-placed');
 
   const handleClick = useCallback((e) => {
     if (!isHuman) return;
-    if (longPressActiveRef.current) return;
     onClickTile && onClickTile(e, tile, src, si);
   }, [isHuman, onClickTile, tile, src, si]);
 
@@ -60,8 +41,7 @@ export default function Tile({
     onDragEnd && onDragEnd(e);
   }, [onDragEnd]);
 
-  // Debug: show color for AI tiles
-  const showColorLabel = debugMode && src === 'hand';
+  const showColorLabel = debugMode && src === 'hand' && !tile.isJoker;
 
   return (
     <div
@@ -70,18 +50,20 @@ export default function Tile({
       data-src={src}
       data-si={si}
       data-ti={ti}
-      draggable={isHuman}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
+      draggable={!!isHuman}
       onClick={handleClick}
       onDoubleClick={handleDblClick}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      title={src === 'board' ? 'Double-click to return to hand' : undefined}
+      title={src === 'board' && isHuman ? 'Double-click to return to hand' : undefined}
       style={{ cursor: isHuman ? 'grab' : 'default' }}
     >
-      <div className="t-num">{tile.isJoker ? '★' : tile.num}</div>
-      {showColorLabel && !tile.isJoker && (
+      {tile.isJoker ? (
+        <div className="joker-face">☺</div>
+      ) : (
+        <div className="t-num">{tile.num}</div>
+      )}
+      {showColorLabel && (
         <div className="t-color">{tile.color[0].toUpperCase()}</div>
       )}
     </div>
