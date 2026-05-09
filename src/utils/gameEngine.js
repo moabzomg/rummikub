@@ -358,7 +358,6 @@ export function findSplitInserts(tile, set, setIdx) {
         if (!tileInLeft && !tileInRight) continue;
         if (tileInLeft && tileInRight) continue; // same tile can't be in both
         if (left.length>=3 && right.length>=3 && isValid(left) && isValid(right)) {
-          const key = `${insertAt}-${cut}`;
           results.push({ si: setIdx, insertAt, cut, left: sortSet(left), right: sortSet(right), tile });
         }
       }
