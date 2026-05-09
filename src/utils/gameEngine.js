@@ -105,8 +105,9 @@ export function sortSet(tiles) {
 
 // ── SORT HAND ──
 export function sortHand(hand, mode) {
-  const combo = bestCombination(hand);
-  const setGroups = combo.sets;
+  const safeHand = (hand || []).filter(t => t && t.id !== undefined);
+  const combo = bestCombination(safeHand);
+  const setGroups = combo.sets.map(s => s.filter(t => t && t.id !== undefined));
   const usedIds = new Set(setGroups.flat().map(t=>t.id));
   const remaining = hand.filter(t=>!usedIds.has(t.id));
   const sortedGroups = setGroups.map(s => sortSet(s));
@@ -180,75 +181,110 @@ export function findJokerReplacements(hand, board) {
 }
 
 // ── SET FINDER ──
+// Safe version: never produces undefined tiles, correctly handles jokers
 export function findAllSets(tiles) {
-  const capped = tiles.slice(0, 16);
+  const capped = tiles.filter(t => t && t.id !== undefined).slice(0, 16);
   const result = [];
+  const jokers = capped.filter(t => t.isJoker);
+  const normals = capped.filter(t => !t.isJoker);
+
+  // ── RUNS: group normals by color, find consecutive windows ──
   const byColor = {};
-  for (const t of capped) {
-    if (t.isJoker) continue;
+  for (const t of normals) {
     if (!byColor[t.color]) byColor[t.color] = [];
     byColor[t.color].push(t);
   }
-  const jokers = capped.filter(t => t.isJoker);
 
-  for (const [, colorTiles] of Object.entries(byColor)) {
-    const sorted = [...colorTiles].sort((a,b) => a.num - b.num);
-    for (let start = 0; start < sorted.length; start++) {
-      let run = [sorted[start]];
-      let ji = 0;
-      for (let end = start+1; end < sorted.length; end++) {
-        const prev = run[run.length - 1];
-        const gap = sorted[end].num - (prev.isJoker ? sorted[end].num - 1 : prev.num) - 1;
-        if (gap < 0) continue;
-        if (gap > jokers.length - ji) break;
-        for (let g = 0; g < gap; g++) run.push(jokers[ji++]);
-        run.push(sorted[end]);
+  for (const colorTiles of Object.values(byColor)) {
+    // Sort and deduplicate by number (keep first occurrence)
+    const sorted = [];
+    const seenN = new Set();
+    for (const t of [...colorTiles].sort((a,b) => a.num - b.num)) {
+      if (!seenN.has(t.num)) { seenN.add(t.num); sorted.push(t); }
+    }
+
+    // Sliding window: try every starting tile, extend with gap-filling jokers
+    for (let s = 0; s < sorted.length; s++) {
+      const run = [sorted[s]];
+      let jokersUsed = 0;
+      let lastNum = sorted[s].num;
+
+      for (let e = s + 1; e < sorted.length; e++) {
+        const gap = sorted[e].num - lastNum - 1; // gaps between lastNum and next tile
+        if (gap < 0) continue; // duplicate num (shouldn't happen after dedup)
+        if (jokersUsed + gap > jokers.length) break; // not enough jokers to fill
+        // Fill gap with jokers
+        for (let g = 0; g < gap; g++) {
+          run.push(jokers[jokersUsed]);
+          jokersUsed++;
+        }
+        run.push(sorted[e]);
+        lastNum = sorted[e].num;
         if (run.length >= 3) result.push([...run]);
         if (run.length >= 13) break;
       }
-      if (jokers.length > 0) {
-        for (let end = start; end < sorted.length - 1; end++) {
-          const r2 = [jokers[0], sorted[end], sorted[end+1]];
-          if (sorted[end+1].num === sorted[end].num + 1 && r2.length >= 3 && isRun(r2)) result.push([...r2]);
+
+      // Also try: joker at the START of a run (★, sorted[s], sorted[s+1], ...)
+      if (jokers.length > 0 && s + 1 < sorted.length) {
+        const gap01 = sorted[s+1] ? sorted[s+1].num - sorted[s].num - 1 : 99;
+        if (gap01 === 0) {
+          // ★ prepended, rest is consecutive
+          const r = [jokers[0], sorted[s], sorted[s+1]];
+          if (isRun(r)) result.push(r);
+          // extend further
+          for (let e = s + 2; e < sorted.length; e++) {
+            const ext = [...r, sorted[e]];
+            if (isRun(ext)) result.push(ext); else break;
+          }
         }
       }
     }
   }
 
+  // ── GROUPS: tiles with same number, different colors ──
   const byNum = {};
-  for (const t of capped) {
-    if (t.isJoker) continue;
+  for (const t of normals) {
     if (!byNum[t.num]) byNum[t.num] = [];
     byNum[t.num].push(t);
   }
-  for (const [, numTiles] of Object.entries(byNum)) {
+
+  for (const numTiles of Object.values(byNum)) {
     const unique = [];
     const seenC = new Set();
-    for (const t of numTiles) { if (!seenC.has(t.color)) { seenC.add(t.color); unique.push(t); } }
+    for (const t of numTiles) {
+      if (!seenC.has(t.color)) { seenC.add(t.color); unique.push(t); }
+    }
     if (unique.length >= 3) {
       result.push(unique.slice(0, 3));
       if (unique.length >= 4) result.push(unique.slice(0, 4));
     }
-    if (jokers.length > 0 && unique.length >= 2) {
-      const withJ = [...unique.slice(0, 2), jokers[0]];
-      if (isGroup(withJ)) result.push(withJ);
-      if (unique.length >= 3) {
-        const withJ2 = [...unique.slice(0, 3), jokers[0]];
-        if (isGroup(withJ2)) result.push(withJ2);
+    // Groups with joker filling missing color slot
+    if (jokers.length > 0) {
+      if (unique.length === 2) {
+        const g = [...unique, jokers[0]];
+        if (isGroup(g)) result.push(g);
+      } else if (unique.length === 3) {
+        const g = [...unique, jokers[0]];
+        if (isGroup(g)) result.push(g);
       }
     }
   }
 
+  // ── DEDUPLICATE by sorted tile ids ──
   const seen = new Set();
   return result.filter(s => {
-    const k = s.map(t=>t.id).sort().join(',');
-    if (seen.has(k)) return false; seen.add(k); return true;
+    if (!s || s.some(t => !t || t.id === undefined)) return false; // safety guard
+    const k = s.map(t => t.id).sort().join(',');
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
   });
 }
 
 // ── BEST COMBINATION ──
 export function bestCombination(tiles) {
-  const allSets = findAllSets(tiles);
+  const safeTiles = (tiles || []).filter(t => t && t.id !== undefined);
+  const allSets = findAllSets(safeTiles);
   if (!allSets.length) return {sets:[], count:0, value:0};
   const sorted = [...allSets].sort((a,b) =>
     b.length !== a.length ? b.length - a.length
@@ -273,7 +309,9 @@ export function bestCombination(tiles) {
     }
   }
   bt(0,[],new Set());
-  return {sets:bestSets, count:bestCount, value:bestValue};
+  // Final safety: strip any undefined tiles from returned sets
+  const cleanSets = bestSets.map(s => s.filter(t => t && t.id !== undefined)).filter(s => s.length >= 3);
+  return {sets:cleanSets, count:cleanSets.flat().length, value:cleanSets.flat().reduce((s,t)=>s+tileVal(t),0)};
 }
 
 // ── BOARD EXTENSIONS ──

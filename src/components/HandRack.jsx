@@ -59,10 +59,12 @@ export default function HandRack({
       clearInterval(lassoRef.current.sweepInterval);
       setLassoIds(new Set());
 
-      const owningSet = playableSets.find(s => s.some(t => t.id === tile.id));
-      if (!owningSet) { longPressFired.current = false; return; }
+      const owningSet = playableSets.find(s =>
+        s && s.some(t => t && t.id === tile.id)
+      );
+      if (!owningSet || !owningSet.length) { longPressFired.current = false; return; }
 
-      const restOfSet = owningSet.filter(t => t.id !== tile.id);
+      const restOfSet = owningSet.filter(t => t && t.id !== undefined && t.id !== tile.id);
       const ids = new Set([tile.id, ...restOfSet.map(t => t.id)]);
       lassoRef.current = { lassoIds: ids, set: owningSet, sweepInterval: null };
 
@@ -72,7 +74,10 @@ export default function HandRack({
       let i = 0;
       const sweep = setInterval(() => {
         if (i >= restOfSet.length) { clearInterval(sweep); setLassoIds(new Set(ids)); return; }
-        setLassoIds(prev => new Set([...prev, restOfSet[i].id]));
+        const t = restOfSet[i];
+        if (t && t.id !== undefined) {
+          setLassoIds(prev => new Set([...prev, t.id]));
+        }
         i++;
       }, 90);
       lassoRef.current.sweepInterval = sweep;
