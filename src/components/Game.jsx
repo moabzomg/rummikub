@@ -5,8 +5,7 @@ import HandRack from './HandRack';
 import HintPanel from './HintPanel';
 import {
   buildPool, sortSet, sortHand, tileVal, handVal,
-  isValidBoard,
-  findAllSets,
+  isValidBoard, findAllSets, findExtensions,
   computeHints, applyHint, aiPlayTurn,
 } from '../utils/gameEngine';
 
@@ -77,17 +76,20 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
   const runAITurnRef = useRef(null);
 
   endGameRef.current = (g, winnerIdx) => {
-    const handVals = g.players.map((p, i) => handVal(g.hands[i]));
+    const handVals = g.players.map((_, i) => handVal(g.hands[i]));
     let wi = winnerIdx;
     if (wi < 0) {
+      // Pool empty: lowest hand value wins
       const min = Math.min(...handVals);
       wi = handVals.findIndex(v => v === min);
     }
-    // Winner earns +sum of all other players' tile values
-    const winnerGain = handVals.reduce((s, v, i) => i !== wi ? s + v : s, 0);
+    const winnerVal = handVals[wi]; // 0 if went out, else lowest
+    // Winner: +sum of all other hands (minus their own if they didn't go out)
+    const winnerGain = handVals.reduce((s, v, i) => i !== wi ? s + v : s, 0) - winnerVal;
+    // Losers: delta = winnerVal - their_val (winner's total minus theirs = usually negative)
     const scores = g.players.map((p, i) => ({
       name: p.name,
-      roundDelta: i === wi ? winnerGain : -handVals[i],
+      roundDelta: i === wi ? winnerGain : (winnerVal - handVals[i]),
       handVal: handVals[i],
       cnt: g.hands[i].length,
       isWinner: i === wi,
@@ -102,9 +104,13 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
   advanceTurnRef.current = (g) => {
     const n = g.players.length;
     const next = (g.currentPlayer + 1) % n;
-    if (g.phase === 'final' && next === g.finalRoundStart) {
-      endGameRef.current(g, -1);
-      return;
+    // Pool empty: count consecutive passes; if all players passed → end round
+    const passes = (g.consecutivePasses || 0) + 1;
+    if (g.phase === 'final') {
+      if (passes >= n || next === g.finalRoundStart) {
+        endGameRef.current(g, -1);
+        return;
+      }
     }
     const ng = {
       ...g,
@@ -113,6 +119,7 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
       pendingHand: null,
       aiMoveLog: [],
       lastPlayedSets: new Set(),
+      consecutivePasses: g.phase === 'final' ? passes : 0,
     };
     setG(ng);
     gRef.current = ng;
@@ -506,7 +513,8 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     if (nh.length === 0) { endGame(newG, pi); return; }
     setSelectedIds(new Set());
     setHintPanelOpen(false);
-    advanceTurn(newG);
+    // Player made a move — reset consecutive passes counter
+    advanceTurn({ ...newG, consecutivePasses: 0 });
   }, [ensurePending, showToast, endGame, advanceTurn]);
 
   const handleReset = useCallback(() => {
