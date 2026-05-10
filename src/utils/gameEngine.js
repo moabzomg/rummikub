@@ -173,11 +173,14 @@ export function findAllSets(tiles) {
     }
   }
 
-  // Dedup and safety filter
+  // Dedup and safety filter: no set with duplicate tile IDs, no undefined tiles
   const seen = new Set();
   return result.filter(s => {
     if (!s||s.some(t=>!t||t.id===undefined)) return false;
-    const k = s.map(t=>t.id).sort().join(',');
+    // Reject sets where same tile appears more than once
+    const tileIds = s.map(t=>t.id);
+    if (new Set(tileIds).size !== tileIds.length) return false;
+    const k = tileIds.sort().join(',');
     if (seen.has(k)) return false; seen.add(k); return true;
   });
 }
@@ -326,73 +329,138 @@ export function findSplitInserts(tile, set, setIdx) {
   });
 }
 
-// ── COMPUTE FULL MOVE SEQUENCE ──
-// Like AI, compute the best sequence of moves starting from hand+board.
-// Returns array of step objects describing each action.
+// ── APPLY ONE MOVE STEP TO STATE ──
+  return {h:nh,b:nb};
+}
+
+// Find board tiles that can replace a joker, freeing that joker
+// The board tile must come from a set that remains valid without it,
+// OR the board tile is placed in a new valid position
+function findBoardJokerReplacements(board) {
+  const results=[];
+  for(let si=0;si<board.length;si++){
+    const set=board[si];
+    const jokerIdxs=set.map((t,i)=>t.isJoker?i:-1).filter(i=>i>=0);
+    for(const ji of jokerIdxs){
+      const jokerNum=inferJokerValue(set,ji);
+      const jokerColor=inferJokerColor(set);
+      if(jokerNum===null) continue;
+      // Look for a board tile in another set that matches this joker slot
+      for(let bsi=0;bsi<board.length;bsi++){
+        if(bsi===si) continue;
+        const bset=board[bsi];
+        for(let bti=0;bti<bset.length;bti++){
+          const bt=bset[bti];
+          if(bt.isJoker) continue;
+          if(bt.num!==jokerNum) continue;
+          if(jokerColor!==null&&bt.color!==jokerColor) continue;
+          // Check if the source set remains valid after removal
+          const remaining=bset.filter((_,i)=>i!==bti);
+          if(remaining.length<3||!isValid(remaining)) continue;
+          // Check if the target set becomes valid with this tile
+          const newTargetSet=[...set];
+          newTargetSet[ji]=bt;
+          if(!isValid(newTargetSet)) continue;
+          results.push({si,ji,boardTile:bt,joker:set[ji],boardTileSi:bsi});
+        }
+      }
+    }
+  }
+  return results;
+}
+
+// ── COMPUTE FULL MOVE SEQUENCE with lookahead ──
+// Uses BFS/greedy search to find best sequence of moves.
 export function computeMoveSequence(hand, board, hasMeld) {
   let h=[...hand], b=board.map(s=>[...s]);
   const steps=[];
 
-  // 1) Joker liberation
-  let improved=true;
-  while(improved){
-    improved=false;
+  const runOnePass=(h,b)=>{
+    let changed=false;
+
+    // A) Direct joker liberation (hand tile replaces board joker)
     const reps=findJokerReplacements(h,b);
     if(reps.length>0){
       const rep=reps[0];
       b[rep.si][rep.ji]=rep.handTile;
       h=h.filter(t=>t.id!==rep.handTile.id);
       h.push(rep.joker);
-      steps.push({type:'joker-lib',desc:`Replace ★ in set ${rep.si+1} with ${rep.handTile.num}(${rep.handTile.color})`,tile:rep.handTile});
-      improved=true;
+      steps.push({type:'joker-lib',si:rep.si,ji:rep.ji,handTile:rep.handTile,joker:rep.joker,
+        desc:`Replace ★ in set ${rep.si+1}`});
+      return {h,b,changed:true};
     }
-  }
 
-  // 2) Split
-  improved=true;
-  while(improved){
-    improved=false;
+    // B) Board-to-board joker liberation (move board tile to free a joker)
+    const breps=findBoardJokerReplacements(b);
+    if(breps.length>0){
+      const brep=breps[0];
+      b[brep.si][brep.ji]=brep.boardTile;
+      // Remove boardTile from its source set
+      b[brep.boardTileSi]=b[brep.boardTileSi].filter(t=>t.id!==brep.boardTile.id);
+      if(b[brep.boardTileSi].length===0) b.splice(brep.boardTileSi,1);
+      else b[brep.boardTileSi]=sortSet(b[brep.boardTileSi]);
+      h.push(brep.joker);
+      steps.push({type:'board-joker-lib',desc:`Free ★ using board tile ${brep.boardTile.num}`,
+        si:brep.si,joker:brep.joker});
+      return {h,b,changed:true};
+    }
+
+    // C) Splits
     for(const ht of h){
-      let found=false;
       for(let si=0;si<b.length;si++){
         const splits=findSplitInserts(ht,b[si],si);
         if(splits.length>0){
           const sp=splits[0];
           h=h.filter(t=>t.id!==ht.id);
           b.splice(si,1,sp.left,sp.right);
-          steps.push({type:'split',desc:`Split set with ${ht.isJoker?'★':ht.num}`,tile:ht});
-          improved=true; found=true; break;
+          steps.push({type:'split',tile:ht,si,sp,desc:`Split set`});
+          return {h,b,changed:true};
         }
       }
-      if(found) break;
     }
-  }
 
-  // 3) Extend
-  improved=true;
-  while(improved){
-    improved=false;
+    // D) Extend board sets
     const exts=findExtensions(h,b);
     if(exts.length>0){
-      const ext=exts[0];
+      // Pick extension that uses highest-value tile
+      const ext=exts.sort((a,z)=>z.val-a.val)[0];
       h=h.filter(t=>t.id!==ext.tile.id);
       if(ext.pos==='start') b[ext.si]=sortSet([ext.tile,...b[ext.si]]);
       else if(ext.pos==='end') b[ext.si]=sortSet([...b[ext.si],ext.tile]);
       else b[ext.si]=sortSet([...b[ext.si].slice(0,ext.insertAt),ext.tile,...b[ext.si].slice(ext.insertAt)]);
-      steps.push({type:'extend',desc:`Extend set with ${ext.tile.isJoker?'★':ext.tile.num}`,tile:ext.tile});
-      improved=true;
+      steps.push({type:'extend',ext,desc:`Extend with ${ext.tile.isJoker?'★':ext.tile.num}`});
+      return {h,b,changed:true};
     }
+
+    return {h,b,changed:false};
+  };
+
+  // Run passes until no more moves
+  let iters=0;
+  let res={h,b,changed:true};
+  while(res.changed&&iters++<30){
+    res=runOnePass(res.h,res.b);
+    h=res.h; b=res.b;
   }
 
-  // 4) New sets from hand
+  // E) New sets from hand (after board manipulation is exhausted)
   const combo=bestCombination(h);
   if(combo.count>0){
     const v=combo.value;
     if(hasMeld||v>=30){
-      const usedIds=new Set(combo.sets.flat().map(t=>t.id));
-      h=h.filter(t=>!usedIds.has(t.id));
-      for(const set of combo.sets){ b.push(sortSet(set)); steps.push({type:'new-set',desc:`Play ${set.length} tiles`,tiles:set}); }
+      for(const set of combo.sets){
+        h=h.filter(t=>!set.some(s=>s.id===t.id));
+        b.push(sortSet(set));
+        steps.push({type:'new-set',set,desc:`Play new set`});
+      }
     }
+  }
+
+  // F) After playing new sets, try again (freed jokers may enable more)
+  res={h,b,changed:true}; iters=0;
+  while(res.changed&&iters++<20){
+    res=runOnePass(res.h,res.b);
+    h=res.h; b=res.b;
   }
 
   return {steps, newHand:h, newBoard:b, moved:steps.length>0};

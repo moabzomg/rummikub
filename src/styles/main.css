@@ -71,9 +71,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: #f0ede8
   letter-spacing: 2px; margin-right: 4px; }
 .ptabs { display: flex; gap: 4px; flex: 1; overflow: hidden; }
 .ptab { padding: 3px 10px; border-radius: 5px; font-size: 11px; font-weight: 500;
-  background: rgba(255,255,255,.06); border: 1px solid transparent; transition: .15s; white-space: nowrap; }
+  background: rgba(255,255,255,.06); border: 1px solid transparent; transition: .15s; white-space: nowrap;
+  display: flex; align-items: center; gap: 5px; }
 .ptab.cur { background: rgba(240,180,41,.15); border-color: var(--gold); color: var(--gold); }
 .ptab.last-turn { border-color: var(--red) !important; animation: lastPulse 1s ease-in-out infinite; }
+.ptab-name { font-weight: 600; }
+.ptab-count { font-size: 9px; background: rgba(255,255,255,.12); border-radius: 3px;
+  padding: 1px 4px; }
+.ptab-nomeld { font-size: 8px; color: #f07070; border: 1px solid rgba(240,112,112,.3);
+  border-radius: 3px; padding: 1px 4px; }
 @keyframes lastPulse { 0%,100%{box-shadow:0 0 0 0 rgba(224,48,48,.4)} 50%{box-shadow:0 0 0 4px rgba(224,48,48,0)} }
 .pool-info { font-size: 11px; color: rgba(255,255,255,.4); margin-left: auto; }
 .debug-toggle { font-size: 10px; padding: 3px 7px; border: 1px solid rgba(255,165,0,.4);

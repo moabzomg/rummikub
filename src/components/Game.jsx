@@ -42,14 +42,17 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
   const [debugMode, setDebugMode] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
   const [aiLabel, setAiLabel] = useState('');
+  const [aiSpeed, setAiSpeed] = useState(300); // ms delay per tile
   const [gameOver, setGameOver] = useState(null);
   const [roundScores, setRoundScores] = useState(null); // accumulated across rounds
 
   const toastTimerRef = useRef(null);
   const aiRef = useRef(false);
   const gRef = useRef(null);
+  const aiSpeedRef = useRef(300);
 
   useEffect(() => { gRef.current = G; }, [G]);
+  useEffect(() => { aiSpeedRef.current = aiSpeed; }, [aiSpeed]);
 
   useEffect(() => {
     const g = initGame(setupPlayers);
@@ -133,7 +136,7 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     setAiRunning(true);
     setAiLabel(`${g.players[pi].name} thinking\u2026`);
 
-    await sleep(300);
+    await sleep(aiSpeedRef.current || 300);
 
     const hand = [...g.hands[pi]];
     const board = g.board.map(s => [...s]);
@@ -294,7 +297,8 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     if (targetSi < ng.pendingBoard.length) {
       const set = ng.pendingBoard[targetSi];
       const pos = Math.min(insertPos !== undefined ? insertPos : set.length, set.length);
-      ng.pendingBoard[targetSi] = sortSet([...set.slice(0, pos), tile, ...set.slice(pos)]);
+      // Don't sortSet here - preserve the user's manual arrangement
+      ng.pendingBoard[targetSi] = [...set.slice(0, pos), tile, ...set.slice(pos)];
     } else {
       ng.pendingBoard.push([tile]);
     }
@@ -572,9 +576,9 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
               key={i}
               className={['ptab', i === G.currentPlayer ? 'cur' : '', G.phase === 'final' ? 'last-turn' : ''].filter(Boolean).join(' ')}
             >
-              {p.name}
-              <span className="tc">{G.hands[i].length}</span>
-              {!G.hasMeld[i] && <span style={{ color: '#f07070', fontSize: '8px' }}> no meld</span>}
+              <span className="ptab-name">{p.name}</span>
+              <span className="ptab-count">{G.hands[i].length}</span>
+              {!G.hasMeld[i] && <span className="ptab-nomeld">no meld</span>}
 
             </div>
           ))}
@@ -626,6 +630,12 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
           </div>
           <button className="btn btn-gold" onClick={handleShowHint} disabled={!isHuman}>💡 Hint</button>
           <button className="btn" onClick={handleReset} disabled={!isHuman}>↺</button>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'rgba(255,255,255,.45)', flexShrink: 0 }}>
+            🤖
+            <input type="range" min="50" max="1500" step="50" value={aiSpeed}
+              onChange={e => setAiSpeed(Number(e.target.value))}
+              style={{ width: '60px', accentColor: 'var(--gold)' }} />
+          </label>
           <button className="btn btn-red" onClick={handleDraw} disabled={!isHuman}>Draw</button>
           <button className="btn btn-green" onClick={handleConfirm} disabled={!isHuman}>✓ OK</button>
         </div>
