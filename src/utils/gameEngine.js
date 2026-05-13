@@ -301,35 +301,79 @@ export function findJokerReplacements(hand, board) {
   return results;
 }
 
-// ── BOARD-TO-BOARD JOKER LIBERATION ──
-// Move a board tile to replace a joker on the board, freeing that joker.
+// ── BOARD JOKER LIBERATION ──
+// Strategy 1: Replace a board joker with a normal tile from another board set,
+//   keeping both sets valid.
+// Strategy 2: Extract a joker from a board set where the remaining tiles can be
+//   extended by a tile from another set (chain reorganisation).
+// Strategy 3: Simply remove a joker from a set that would remain valid without it
+//   (e.g. set has extra tiles beyond minimum).
 function findBoardJokerReplacements(board) {
   const results = [];
+
   for (let si = 0; si < board.length; si++) {
     const set = board[si];
     const jokerIdxs = set.map((t,i) => t.isJoker ? i : -1).filter(i => i >= 0);
+    if (!jokerIdxs.length) continue;
+
     for (const ji of jokerIdxs) {
       const jokerNum = inferJokerValue(set, ji);
       const jokerColor = inferJokerColor(set);
-      if (jokerNum === null) continue;
+
+      // Strategy 1: another board set has a tile that can slot in here
       for (let bsi = 0; bsi < board.length; bsi++) {
         if (bsi === si) continue;
         const bset = board[bsi];
         for (let bti = 0; bti < bset.length; bti++) {
           const bt = bset[bti];
           if (bt.isJoker) continue;
-          if (bt.num !== jokerNum) continue;
+          if (jokerNum !== null && bt.num !== jokerNum) continue;
           if (jokerColor !== null && bt.color !== jokerColor) continue;
+          // Source set must stay valid after removal
           const remaining = bset.filter((_,i) => i !== bti);
           if (remaining.length < 3 || !isValid(remaining)) continue;
+          // Target set becomes valid with this tile
           const newTargetSet = [...set]; newTargetSet[ji] = bt;
           if (!isValid(newTargetSet)) continue;
-          results.push({si, ji, boardTile:bt, joker:set[ji], boardTileSi:bsi});
+          results.push({type:'board-swap', si, ji, boardTile:bt, joker:set[ji], boardTileSi:bsi});
         }
+      }
+
+      // Strategy 2: extract joker from this set if remaining tiles can be
+      // rescued by appending/prepending a tile from another set.
+      // e.g. 1,2,★,★ → remove one ★, patch the gap with a 3 from elsewhere
+      const withoutJoker = set.filter((_,i) => i !== ji);
+      // Try extending withoutJoker with each board tile to make it valid
+      for (let bsi = 0; bsi < board.length; bsi++) {
+        if (bsi === si) continue;
+        const bset = board[bsi];
+        for (let bti = 0; bti < bset.length; bti++) {
+          const bt = bset[bti];
+          if (bt.isJoker) continue;
+          const remaining = bset.filter((_,i) => i !== bti);
+          if (remaining.length < 3 || !isValid(remaining)) continue;
+          // Can we patch withoutJoker + bt to make a valid set?
+          const patched = sortSet([...withoutJoker, bt]);
+          if (patched.length >= 3 && isValid(patched)) {
+            results.push({type:'extract-patch', si, ji, joker:set[ji], patchTile:bt, patchTileSi:bsi, patched});
+          }
+        }
+      }
+
+      // Strategy 3: the set has ≥4 tiles and remains valid with the joker simply removed
+      const withoutJ = set.filter((_,i) => i !== ji);
+      if (withoutJ.length >= 3 && isValid(withoutJ)) {
+        results.push({type:'extract-direct', si, ji, joker:set[ji]});
       }
     }
   }
-  return results;
+
+  // Deduplicate by joker id
+  const seen = new Set();
+  return results.filter(r => {
+    const k = `${r.si}-${r.ji}-${r.type}`;
+    if (seen.has(k)) return false; seen.add(k); return true;
+  });
 }
 
 // ── BOARD EXTENSIONS ──
@@ -383,6 +427,112 @@ export function findSplitInserts(tile, set, setIdx) {
 }
 
 // ── MOVE SEQUENCE ENGINE (lookahead) ──
+// ── BOARD TILE EXTRACTION ──
+// Find board tiles that can be removed from their set (leaving it still valid)
+// and combined with hand tiles to form a new valid set.
+// e.g. board has 9,10,11,12,13 (orange). Remove 13 → 9,10,11,12 still valid.
+// Hand has 13black, 13blue → new group 13orange+13black+13blue.
+function findBoardExtractions(hand, board) {
+  const results = [];
+
+  // Build a list of extractable board tiles (tile, its setIdx, remaining set stays valid)
+  const extractable = [];
+  for (let si = 0; si < board.length; si++) {
+    const set = board[si];
+    for (let ti = 0; ti < set.length; ti++) {
+      const tile = set[ti];
+      if (tile.isJoker) continue;
+      const remaining = set.filter((_,i) => i !== ti);
+      if (remaining.length < 3 || !isValid(remaining)) continue;
+      extractable.push({tile, si, ti, remaining});
+    }
+  }
+
+  if (!extractable.length) return results;
+
+  // For each combination of hand tiles + extractable board tiles,
+  // check if they can form a valid set.
+  // Limit: try groups (same number, different colors) and short runs.
+
+  const handNorm = hand.filter(t => !t.isJoker);
+
+  // Strategy A: form a group using hand tiles + board tiles
+  // Group needs 3-4 tiles with same number, different colors
+  const allNorm = [
+    ...handNorm.map(t => ({...t, fromHand:true})),
+    ...extractable.map(e => ({...e.tile, fromHand:false, si:e.si, remaining:e.remaining})),
+  ];
+
+  const byNum = {};
+  for (const t of allNorm) {
+    if (!byNum[t.num]) byNum[t.num] = [];
+    byNum[t.num].push(t);
+  }
+
+  for (const [, tiles] of Object.entries(byNum)) {
+    // Deduplicate by color (take first of each color)
+    const byColor = {};
+    for (const t of tiles) {
+      if (!byColor[t.color]) byColor[t.color] = t;
+    }
+    const unique = Object.values(byColor);
+    if (unique.length < 3) continue;
+
+    // Must have at least one hand tile (otherwise it's a pure board rearrangement)
+    const handPart = unique.filter(t => t.fromHand);
+    if (!handPart.length) continue;
+
+    // Try all 3-tile and 4-tile combos
+    for (let size = 3; size <= Math.min(4, unique.length); size++) {
+      // Pick all combos of `size` from unique
+      const combos = [];
+      const pick = (start, chosen) => {
+        if (chosen.length === size) { combos.push([...chosen]); return; }
+        for (let i = start; i < unique.length; i++) pick(i+1, [...chosen, unique[i]]);
+      };
+      pick(0, []);
+
+      for (const combo of combos) {
+        if (!combo.some(t => t.fromHand)) continue; // need at least one hand tile
+        const tileObjs = combo.map(t => ({id:t.id, color:t.color, num:t.num, isJoker:false}));
+        if (!isGroup(tileObjs)) continue;
+
+        // Collect board extractions needed
+        const boardExtracts = combo.filter(t => !t.fromHand);
+        const handTiles = combo.filter(t => t.fromHand);
+
+        // Verify all board extractions are from different sets (or same set only if tile count allows)
+        const siCounts = {};
+        let valid = true;
+        for (const be of boardExtracts) {
+          siCounts[be.si] = (siCounts[be.si] || 0) + 1;
+          // Check the remaining set after removing this tile
+          const srcSet = board[be.si];
+          const rem = srcSet.filter(t => t.id !== be.id);
+          if (rem.length < 3 || !isValid(rem)) { valid = false; break; }
+        }
+        if (!valid) continue;
+
+        results.push({
+          type: 'extract-group',
+          newSet: sortSet(tileObjs),
+          boardExtracts: boardExtracts.map(be => ({tile:be, si:be.si})),
+          handTiles: handTiles.map(t => ({id:t.id, color:t.color, num:t.num, isJoker:false})),
+          value: tileObjs.reduce((s,t) => s + t.num, 0),
+          desc: `Form ${tileObjs[0].num}-group from board+hand`,
+        });
+      }
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set();
+  return results.filter(r => {
+    const k = r.newSet.map(t=>t.id).sort().join(',');
+    if (seen.has(k)) return false; seen.add(k); return true;
+  }).sort((a,z) => z.value - a.value);
+}
+
 function runOnePass(h, b, steps) {
   // A) Hand tile replaces board joker
   const reps = findJokerReplacements(h, b);
@@ -396,16 +546,34 @@ function runOnePass(h, b, steps) {
     return {h, b, changed:true};
   }
 
-  // B) Board tile replaces board joker (board reorganisation)
+  // B) Board reorganisation to free a joker
   const breps = findBoardJokerReplacements(b);
   if (breps.length > 0) {
-    const brep = breps[0];
+    // Prefer extract-direct (simplest), then board-swap, then extract-patch
+    const order = ['extract-direct', 'board-swap', 'extract-patch'];
+    const brep = breps.sort((a,z) => order.indexOf(a.type) - order.indexOf(z.type))[0];
     b = b.map(s => [...s]);
-    b[brep.si][brep.ji] = brep.boardTile;
-    b[brep.boardTileSi] = b[brep.boardTileSi].filter(t => t.id !== brep.boardTile.id);
-    if (b[brep.boardTileSi].length === 0) b.splice(brep.boardTileSi, 1);
-    else b[brep.boardTileSi] = sortSet(b[brep.boardTileSi]);
-    h = [...h, brep.joker];
+
+    if (brep.type === 'board-swap') {
+      // Swap a board tile into joker slot; original tile's set shrinks
+      b[brep.si][brep.ji] = brep.boardTile;
+      b[brep.boardTileSi] = b[brep.boardTileSi].filter(t => t.id !== brep.boardTile.id);
+      if (b[brep.boardTileSi].length === 0) b.splice(brep.boardTileSi, 1);
+      else b[brep.boardTileSi] = sortSet(b[brep.boardTileSi]);
+      h = [...h, brep.joker];
+    } else if (brep.type === 'extract-patch') {
+      // Remove joker from set, patch remaining tiles with a tile from another set
+      b[brep.si] = sortSet(brep.patched);
+      b[brep.patchTileSi] = b[brep.patchTileSi].filter(t => t.id !== brep.patchTile.id);
+      if (b[brep.patchTileSi].length === 0) b.splice(brep.patchTileSi, 1);
+      else b[brep.patchTileSi] = sortSet(b[brep.patchTileSi]);
+      h = [...h, brep.joker];
+    } else {
+      // extract-direct: set stays valid without the joker
+      b[brep.si] = sortSet(b[brep.si].filter((_,i) => i !== brep.ji));
+      h = [...h, brep.joker];
+    }
+
     steps.push({type:'board-joker-lib', desc:'Reorganise board to free ★'});
     return {h, b, changed:true};
   }
@@ -436,6 +604,33 @@ function runOnePass(h, b, steps) {
     else b[ext.si] = sortSet([...b[ext.si].slice(0,ext.insertAt), ext.tile, ...b[ext.si].slice(ext.insertAt)]);
     steps.push({type:'extend', desc:`Extend with ${ext.tile.isJoker?'★':ext.tile.num}`});
     return {h, b, changed:true};
+  }
+
+  // E) Extract board tiles + hand tiles to form new group
+  if (h.length > 0) {
+    const extractions = findBoardExtractions(h, b);
+    if (extractions.length > 0) {
+      const ex = extractions[0];
+      b = b.map(s => [...s]);
+      // Remove extracted tiles from their board sets
+      const removedSis = new Set();
+      for (const {tile, si} of ex.boardExtracts) {
+        b[si] = b[si].filter(t => t.id !== tile.id);
+        removedSis.add(si);
+      }
+      // Sort modified sets; remove empty ones
+      for (const si of [...removedSis].sort((a,z) => z-a)) {
+        if (b[si].length === 0) b.splice(si, 1);
+        else b[si] = sortSet(b[si]);
+      }
+      // Remove hand tiles used
+      const usedHandIds = new Set(ex.handTiles.map(t => t.id));
+      h = h.filter(t => !usedHandIds.has(t.id));
+      // Add new set to board
+      b.push(ex.newSet);
+      steps.push({type:'extract-group', desc:ex.desc});
+      return {h, b, changed:true};
+    }
   }
 
   return {h, b, changed:false};
@@ -579,6 +774,20 @@ export function computeHints(hand, board, hasMeld) {
         sets:[], exts:es, splits:[], value:tileVal(t), count:1, applicable:true, tile:t,
       });
     }
+
+    // 6) Board+hand extractions (e.g. take 13s from runs to form a group)
+    const extractions = findBoardExtractions(hand, board);
+    for (const ex of extractions.slice(0, 3)) {
+      const handIds = new Set(ex.handTiles.map(t => t.id));
+      if (ex.handTiles.some(t => allUsedIds.has(t.id))) continue;
+      hints.push({
+        type:'extract-group', label:'COMBINE',
+        desc:ex.desc,
+        sets:[ex.newSet], exts:[], splits:[],
+        value:ex.value, count:ex.newSet.length, applicable:true,
+        boardExtracts:ex.boardExtracts, handTiles:ex.handTiles,
+      });
+    }
   }
 
   if (!hints.filter(h => h.applicable).length) {
@@ -636,6 +845,33 @@ export function applyHint(hint, pendingHand, pendingBoard) {
     const {si, left, right, tile} = sp;
     hand = hand.filter(t => t.id !== tile.id);
     board.splice(si, 1, left, right);
+  }
+  if (hint.boardExtracts && hint.boardExtracts.length > 0) {
+    // Extract tiles from board sets and hand to form a new set
+    const handIds = new Set((hint.handTiles||[]).map(t => t.id));
+    hand = hand.filter(t => !handIds.has(t.id));
+    // Remove board tiles - process in reverse index order to avoid shifting
+    const bySi = {};
+    for (const {tile, si} of hint.boardExtracts) {
+      if (!bySi[si]) bySi[si] = [];
+      bySi[si].push(tile.id);
+    }
+    for (const [siStr, ids] of Object.entries(bySi)) {
+      const si = Number(siStr);
+      const idSet = new Set(ids);
+      board[si] = board[si].filter(t => !idSet.has(t.id));
+    }
+    // Remove empty sets (in reverse order)
+    for (let i = board.length - 1; i >= 0; i--) {
+      if (board[i].length === 0) board.splice(i, 1);
+      else if (board[i].length < 3) board[i] = sortSet(board[i]); // keep but may be invalid
+    }
+    // Add the new combined set
+    if (hint.sets && hint.sets.length > 0) {
+      // Already in hint.sets from computeHints
+    } else {
+      board.push(sortSet([...(hint.handTiles||[]), ...(hint.boardExtracts||[]).map(e => e.tile)]));
+    }
   }
   return {hand, board};
 }
