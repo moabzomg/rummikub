@@ -7,15 +7,8 @@ export default function App() {
   const [phase, setPhase] = useState('setup');
   const [players, setPlayers] = useState(null);
 
-  const handleStart = (ps) => {
-    setPlayers(ps);
-    setPhase('game');
-  };
-
-  const handleReturnToMenu = () => {
-    setPlayers(null);
-    setPhase('setup');
-  };
+  const handleStart = (ps) => { setPlayers(ps); setPhase('game'); };
+  const handleReturnToMenu = () => { setPlayers(null); setPhase('setup'); };
 
   if (phase === 'game' && players) {
     return <Game setupPlayers={players} onReturnToMenu={handleReturnToMenu} />;
