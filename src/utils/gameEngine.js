@@ -641,12 +641,14 @@ export function computeMoveSequence(hand, board, hasMeld) {
   let b = (board||[]).map(s => [...s]);
   const steps = [];
 
-  // Phase 1: board manipulation + extensions
-  let iters = 0;
-  let changed = true;
-  while (changed && iters++ < 40) {
-    const res = runOnePass(h, b, steps);
-    h = res.h; b = res.b; changed = res.changed;
+  // Phase 1: board manipulation + extensions (only after initial meld)
+  if (hasMeld) {
+    let iters = 0;
+    let changed = true;
+    while (changed && iters++ < 40) {
+      const res = runOnePass(h, b, steps);
+      h = res.h; b = res.b; changed = res.changed;
+    }
   }
 
   // Phase 2: play best hand combo
@@ -658,11 +660,13 @@ export function computeMoveSequence(hand, board, hasMeld) {
       steps.push({type:'new-set', desc:`Play ${set.length}-tile set`});
     }
 
-    // Phase 3: try again after playing new sets
-    iters = 0; changed = true;
-    while (changed && iters++ < 20) {
-      const res = runOnePass(h, b, steps);
-      h = res.h; b = res.b; changed = res.changed;
+    // Phase 3: try again after playing new sets (only post-meld)
+    if (hasMeld) {
+      iters = 0; changed = true;
+      while (changed && iters++ < 20) {
+        const res = runOnePass(h, b, steps);
+        h = res.h; b = res.b; changed = res.changed;
+      }
     }
   }
 

@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import Tile from './Tile';
 import { isValid, isRun } from '../utils/gameEngine';
 
-export default function Board({ board, prevBoardIds, aiMovedIds, isHuman, hasMeld, lastPlayedSets, debugMode, onDropOnSet, onDropNewSet, onTileClick, onTileDblClick, onDragStart, onDragEnd }) {
+export default function Board({ board, prevBoardIds, aiMovedIds, isHuman, hasMeld, originalBoardLen, lastPlayedSets, debugMode, onDropOnSet, onDropNewSet, onTileClick, onTileDblClick, onDragStart, onDragEnd }) {
   const getSetLabel = useCallback((set) => {
     if (!isValid(set)) return 'invalid';
     return isRun(set) ? 'run' : 'group';
@@ -40,7 +40,8 @@ export default function Board({ board, prevBoardIds, aiMovedIds, isHuman, hasMel
           const hasNewTile = set.some(t => !prevBoardIds.has(t.id));
           const isAiNew = hasNewTile && aiMovedIds.size > 0;
           const isLastPlayed = lastPlayedSets && lastPlayedSets.has(si);
-          const isLocked = isHuman && !hasMeld && set.every(t => prevBoardIds.has(t.id));
+          // Before meld: all original board sets are locked (by index, not content)
+          const isLocked = isHuman && !hasMeld && si < (originalBoardLen ?? prevBoardIds.size);
 
           const cls = ['bset'];
           if (!isValid(set)) cls.push('invalid');

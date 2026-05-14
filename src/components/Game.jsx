@@ -241,8 +241,17 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     if (!g) return;
     const pi = g.currentPlayer;
     const hasMeld = g.hasMeld[pi];
+    // Before meld: can only drop into NEW sets created this turn (index >= original board length)
     if (!hasMeld && targetSi < g.board.length) {
-      showToast('You must complete your initial meld first!'); dragStateRef.current.tile = null; return;
+      showToast('Cannot add to existing sets before your initial meld!');
+      dragStateRef.current.tile = null;
+      return;
+    }
+    // Before meld: also prevent dragging FROM existing board sets (belt-and-suspenders)
+    if (!hasMeld && ds.src === 'board' && ds.srcSi !== null && ds.srcSi < g.board.length) {
+      showToast('Cannot move existing board tiles before your initial meld!');
+      dragStateRef.current.tile = null;
+      return;
     }
     let ng = ensurePending(g);
     const tile = ds.tile;
@@ -279,10 +288,20 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     if (!ds.tile) return;
     const g = gRef.current;
     if (!g) return;
-    let ng = ensurePending(g);
+    const pi = g.currentPlayer;
+    const hasMeld = g.hasMeld[pi];
     const tile = ds.tile;
     const src = ds.src;
     const srcSi = ds.srcSi;
+
+    // Before meld: cannot drag from existing board sets
+    if (!hasMeld && src === 'board' && srcSi !== null && srcSi < g.board.length) {
+      showToast('Cannot move existing board tiles before your initial meld!');
+      dragStateRef.current.tile = null;
+      return;
+    }
+
+    let ng = ensurePending(g);
     if (src === 'hand') {
       ng.pendingHand = ng.pendingHand.filter(t => t.id !== tile.id);
       setSelectedIds(prev => { const s = new Set(prev); s.delete(tile.id); return s; });
@@ -293,7 +312,7 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     ng.pendingBoard.push([tile]);
     dragStateRef.current.tile = null;
     setG({ ...ng }); gRef.current = { ...ng };
-  }, [ensurePending]);
+  }, [ensurePending, showToast]);
 
   // ── TILE INTERACTIONS ──
   const handleTileClick = useCallback((e, tile, src) => {
@@ -409,30 +428,52 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
     const nb = ng.pendingBoard;
     const nh = ng.pendingHand;
 
-    if (!isValidBoard(nb)) { showToast('Board has invalid sets — fix before confirming!'); return; }
-
     const prevBoardIds = new Set(g.board.flat().map(t => t.id));
     const newBoardIds = new Set(nb.flat().map(t => t.id));
     const placed = [...newBoardIds].filter(id => !prevBoardIds.has(id));
+
     if (placed.length === 0) { showToast('Place at least one tile, or Draw & Pass'); return; }
 
+    // Cannot take original board tiles back to hand
     const newHandIds = new Set(nh.map(t => t.id));
     const takenFromBoard = [...prevBoardIds].filter(id => !newBoardIds.has(id) && newHandIds.has(id));
     if (takenFromBoard.length > 0) { showToast('Cannot take original board tiles back to hand!'); return; }
 
     if (!g.hasMeld[pi]) {
-      const originalBoardLen = g.board.length;
-      for (let si = 0; si < nb.length; si++) {
+      // ── INITIAL MELD RULES ──
+      // 1. Every new set must consist ENTIRELY of hand tiles (no mixing with board)
+      // 2. Every new set must be independently valid (proper run or group)
+      // 3. Cannot modify any existing board set
+      // 4. Total value of placed tiles must be ≥ 30
+
+      // Check existing board sets are untouched
+      for (let si = 0; si < g.board.length; si++) {
+        const origSet = g.board[si];
+        const pendSet = nb[si];
+        if (!pendSet) { showToast('Cannot remove existing board sets!'); return; }
+        const origIds = origSet.map(t => t.id).sort().join(',');
+        const pendIds = pendSet.map(t => t.id).sort().join(',');
+        if (origIds !== pendIds) { showToast('Cannot modify the board before your initial meld!'); return; }
+      }
+      // No extra sets that mix old+new tiles
+      for (let si = g.board.length; si < nb.length; si++) {
         const set = nb[si];
-        const hasNew = set.some(t => !prevBoardIds.has(t.id));
         const hasOld = set.some(t => prevBoardIds.has(t.id));
-        if ((hasNew && hasOld) || (si < originalBoardLen && hasNew)) {
-          showToast('Initial meld must use only your own tiles!'); return;
+        if (hasOld) { showToast('Initial meld sets must contain only your own tiles!'); return; }
+        // Each new set must be a valid run or group on its own
+        if (!isValidBoard([set])) {
+          showToast(`Set ${si - g.board.length + 1} is not a valid run or group!`); return;
         }
       }
+
+      // Check total value ≥ 30
       const placedTiles = g.hands[pi].filter(t => placed.includes(t.id));
       const v = placedTiles.reduce((s, t) => s + tileVal(t), 0);
-      if (v < 30) { showToast(`Initial meld needs 30+ pts. You placed ${v} pts.`); return; }
+      if (v < 30) { showToast(`Initial meld needs 30+ pts. You have ${v} pts — need ${30 - v} more.`); return; }
+
+    } else {
+      // Post-meld: full board must be valid
+      if (!isValidBoard(nb)) { showToast('Board has invalid sets — fix before confirming!'); return; }
     }
 
     const newG = {
@@ -526,6 +567,7 @@ export default function Game({ setupPlayers, onReturnToMenu }) {
       <Board
         board={board} prevBoardIds={prevBoardIds} aiMovedIds={aiMovedIds}
         isHuman={isHuman} hasMeld={humanIdx>=0?G.hasMeld[humanIdx]:true}
+        originalBoardLen={G.board.length}
         lastPlayedSets={G.lastPlayedSets} debugMode={debugMode}
         onDropOnSet={handleDropOnSet} onDropNewSet={handleDropNewSet}
         onTileClick={handleTileClick} onTileDblClick={handleTileDblClick}
