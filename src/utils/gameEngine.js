@@ -642,9 +642,9 @@ export function computeMoveSequence(hand, board, hasMeld) {
   const steps = [];
 
   // Phase 1: board manipulation + extensions (only after initial meld)
+  let iters = 0;
+  let changed = true;
   if (hasMeld) {
-    let iters = 0;
-    let changed = true;
     while (changed && iters++ < 40) {
       const res = runOnePass(h, b, steps);
       h = res.h; b = res.b; changed = res.changed;
