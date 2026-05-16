@@ -64,10 +64,19 @@ export default function Game({ config, onBackToMenu }) {
   }, [initWorkingState]);
 
   const handleDropToSet = useCallback((tileId, source, setIdx) => {
-    // Pre-meld: block dragging existing board tiles
-    if (!state.players[0].hasMelded && source === 'board') {
-      addLog('❌ You cannot touch board tiles before your initial meld!');
-      return;
+    // Pre-meld: cannot touch board tiles, and cannot extend existing board sets
+    if (!state.players[0].hasMelded) {
+      if (source === 'board') {
+        addLog('❌ You cannot touch board tiles before your initial meld!');
+        return;
+      }
+      // Block dropping onto any set that contains original board tiles
+      const originalBoardTileIds = new Set(state.board.flat().map(t => t.id));
+      const targetSet = (workingBoard || state.board)[setIdx] || [];
+      if (targetSet.some(t => originalBoardTileIds.has(t.id))) {
+        addLog('❌ Initial meld: you cannot extend existing board sets!');
+        return;
+      }
     }
     initWorkingState();
 
@@ -503,6 +512,8 @@ export default function Game({ config, onBackToMenu }) {
             selectedIds={selectedIds}
             newlyPlayedIds={newlyPlayedIds}
             isInteractive={isHumanTurn}
+            preMeld={isHumanTurn && !human?.hasMelded}
+            originalBoardSize={state.board.length}
             onTileClick={handleBoardTileClick}
             onDropToSet={handleDropToSet}
             onDropToNew={handleDropToNew}

@@ -12,6 +12,8 @@ export default function Board({
   onDropToNew,
   onDragStartBoardTile,
   isInteractive,
+  preMeld = false,
+  originalBoardSize = 0,
 }) {
   const dragCtx = useDrag();
   const setZoneRefs = useRef([]);
@@ -74,11 +76,12 @@ export default function Board({
       <div className="board-sets">
         {sets.map((set, setIdx) => {
           const valid = isValidSet(set);
+          const isLockedSet = preMeld && setIdx < originalBoardSize;
           return (
             <div
               key={setIdx}
               ref={el => { setZoneRefs.current[setIdx] = el; }}
-              className={`board-set ${valid ? 'set-valid' : 'set-invalid'}`}
+              className={`board-set ${valid ? 'set-valid' : 'set-invalid'} ${isLockedSet ? 'set-locked' : ''}`}
               onDragOver={handleDragOver}
               onDrop={e => handleSetDrop(e, setIdx)}
             >
@@ -88,11 +91,12 @@ export default function Board({
                   tile={tile}
                   selected={selectedIds?.has(tile.id)}
                   isNew={newlyPlayedIds?.has(tile.id)}
-                  draggable={isInteractive}
+                  draggable={isInteractive && !isLockedSet}
                   source="board"
                   sourceSetIdx={setIdx}
-                  onClick={() => isInteractive && onTileClick?.(tile, setIdx)}
+                  onClick={() => isInteractive && !isLockedSet && onTileClick?.(tile, setIdx)}
                   onDragStart={e => {
+                    if (isLockedSet) { e.preventDefault(); return; }
                     e.dataTransfer.setData('tileId', String(tile.id));
                     e.dataTransfer.setData('source', 'board');
                     e.dataTransfer.setData('sourceSetIdx', String(setIdx));
@@ -100,6 +104,7 @@ export default function Board({
                   }}
                 />
               ))}
+              {isLockedSet && <span className="set-lock-icon">🔒</span>}
             </div>
           );
         })}
