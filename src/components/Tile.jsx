@@ -1,46 +1,50 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 
-export default function Tile({ tile, src, si, ti, selected, highlighted, aiPlaced, isHuman, debugMode, onClickTile, onDblClickTile, onDragStart, onDragEnd }) {
-  const cls = ['tile', 'c-' + tile.color];
-  if (src === 'board') cls.push('in-board');
-  if (selected) cls.push('selected');
-  if (highlighted) cls.push('hint-highlight');
-  if (aiPlaced) cls.push('ai-placed');
+const COLOR_STYLES = {
+  black: { color: '#1a1a1a' },
+  blue: { color: '#1565c0' },
+  orange: { color: '#e65100' },
+  red: { color: '#c62828' },
+  joker: { color: '#8e24aa' },
+};
 
-  const handleClick = useCallback((e) => {
-    if (!isHuman) return;
-    onClickTile && onClickTile(e, tile, src, si);
-  }, [isHuman, onClickTile, tile, src, si]);
+export default function Tile({
+  tile,
+  hidden = false,
+  selected = false,
+  draggable = false,
+  onDragStart,
+  onClick,
+  small = false,
+  style = {},
+}) {
+  if (!tile) return null;
 
-  const handleDblClick = useCallback((e) => {
-    if (!isHuman) return;
-    e.preventDefault();
-    onDblClickTile && onDblClickTile(e, tile, src, si);
-  }, [isHuman, onDblClickTile, tile, src, si]);
+  const sizeClass = small ? 'tile tile-small' : 'tile';
 
-  const handleDragStart = useCallback((e) => {
-    if (!isHuman) return;
-    onDragStart && onDragStart(e, tile, src, si);
-  }, [isHuman, onDragStart, tile, src, si]);
+  if (hidden) {
+    return (
+      <div
+        className={`${sizeClass} tile-hidden`}
+        style={style}
+      />
+    );
+  }
 
-  const handleDragEnd = useCallback((e) => { onDragEnd && onDragEnd(e); }, [onDragEnd]);
+  const colorStyle = COLOR_STYLES[tile.color] || COLOR_STYLES.black;
 
   return (
     <div
-      className={cls.join(' ')}
-      data-id={tile.id} data-src={src} data-si={si} data-ti={ti}
-      draggable={!!isHuman}
-      onClick={handleClick} onDoubleClick={handleDblClick}
-      onDragStart={handleDragStart} onDragEnd={handleDragEnd}
-      title={src === 'board' && isHuman ? 'Double-click to return to hand' : undefined}
-      style={{ cursor: isHuman ? 'grab' : 'default' }}
+      className={`${sizeClass} ${selected ? 'tile-selected' : ''} ${draggable ? 'tile-draggable' : ''}`}
+      style={{ ...colorStyle, ...style }}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onClick={onClick}
     >
-      {tile.isJoker
-        ? <div className="joker-face">☺</div>
-        : <div className="t-num">{tile.num}</div>
-      }
-      {debugMode && src === 'hand' && !tile.isJoker && (
-        <div className="t-color">{tile.color[0].toUpperCase()}</div>
+      {tile.isJoker ? (
+        <span className="tile-joker-icon">☺</span>
+      ) : (
+        <span className="tile-number">{tile.number}</span>
       )}
     </div>
   );

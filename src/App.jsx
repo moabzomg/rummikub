@@ -4,14 +4,14 @@ import Game from './components/Game';
 import './styles/main.css';
 
 export default function App() {
-  const [phase, setPhase] = useState('setup');
-  const [players, setPlayers] = useState(null);
+  const [config, setConfig] = useState(null);
 
-  const handleStart = (ps) => { setPlayers(ps); setPhase('game'); };
-  const handleReturnToMenu = () => { setPlayers(null); setPhase('setup'); };
+  const handleStart = (cfg) => setConfig(cfg);
+  const handleBackToMenu = () => setConfig(null);
 
-  if (phase === 'game' && players) {
-    return <Game setupPlayers={players} onReturnToMenu={handleReturnToMenu} />;
+  if (!config) {
+    return <Setup onStart={handleStart} />;
   }
-  return <Setup onStart={handleStart} />;
+
+  return <Game key={JSON.stringify(config)} config={config} onBackToMenu={handleBackToMenu} />;
 }

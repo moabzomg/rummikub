@@ -1,47 +1,87 @@
 import React, { useState } from 'react';
 
-const DEFAULT_PLAYERS = [
-  { name: 'You', type: 'human' },
-  { name: 'AI Aria', type: 'ai' },
-];
+const AI_NAMES = ['Ethan', 'Connie', 'Morgan', 'Alex', 'Jordan', 'Casey'];
 
 export default function Setup({ onStart }) {
-  const [players, setPlayers] = useState(DEFAULT_PLAYERS);
+  const [playerName, setPlayerName] = useState('bjnss');
+  const [numAI, setNumAI] = useState(3);
+  const [aiSpeed, setAiSpeed] = useState(1200);
+  const [debugMode, setDebugMode] = useState(false);
 
-  const updateName = (i, name) =>
-    setPlayers(prev => prev.map((p, idx) => idx === i ? {...p, name} : p));
-  const updateType = (i, type) =>
-    setPlayers(prev => prev.map((p, idx) => idx === i ? {...p, type} : p));
-  const addPlayer = () => {
-    if (players.length >= 4) return;
-    const names = ['Bolt', 'Cruz', 'Dune'];
-    setPlayers(prev => [...prev, { name: `AI ${names[prev.length-2]}`, type: 'ai' }]);
+  const handleStart = () => {
+    const aiNames = AI_NAMES.slice(0, numAI);
+    onStart({
+      playerName: playerName.trim() || 'Player',
+      aiNames,
+      aiSpeed,
+      debugMode,
+    });
   };
-  const removePlayer = (i) => setPlayers(prev => prev.filter((_,idx) => idx !== i));
 
   return (
-    <div className="setup">
-      <div className="logo">Rummikub</div>
-      <div className="logo-sub">Tile Strategy Game</div>
+    <div className="setup-screen">
       <div className="setup-card">
-        <h3>Players</h3>
-        <div className="player-rows">
-          {players.map((p, i) => (
-            <div key={i} className="player-row">
-              <div className="p-num">{i+1}</div>
-              <input className="p-name" value={p.name} onChange={e => updateName(i, e.target.value)} placeholder={`Player ${i+1}`} />
-              <div className="type-btns">
-                <button className={`tbtn${p.type==='human'?' on':''}`} onClick={() => updateType(i,'human')}>Human</button>
-                <button className={`tbtn${p.type==='ai'?' on':''}`} onClick={() => updateType(i,'ai')}>AI</button>
-              </div>
-              {players.length > 2 && (
-                <button className="btn" style={{padding:'3px 7px',fontSize:'10px'}} onClick={() => removePlayer(i)}>✕</button>
-              )}
-            </div>
-          ))}
+        <div className="setup-logo">
+          <div className="setup-logo-the">The Original</div>
+          <div className="setup-logo-name">Rummikub</div>
         </div>
-        {players.length < 4 && <button className="add-p" onClick={addPlayer}>+ Add Player (max 4)</button>}
-        <button className="start-btn" onClick={() => onStart(players.map(p => ({...p})))}>DEAL TILES</button>
+
+        <div className="setup-field">
+          <label>Your Name</label>
+          <input
+            className="setup-input"
+            value={playerName}
+            onChange={e => setPlayerName(e.target.value)}
+            maxLength={12}
+            placeholder="Your name"
+          />
+        </div>
+
+        <div className="setup-field">
+          <label>Opponents</label>
+          <div className="setup-radio-group">
+            {[1, 2, 3].map(n => (
+              <button
+                key={n}
+                className={`setup-radio-btn ${numAI === n ? 'active' : ''}`}
+                onClick={() => setNumAI(n)}
+              >
+                {n} AI
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="setup-field">
+          <label>AI Speed</label>
+          <div className="setup-slider-row">
+            <span className="setup-slider-label">Fast</span>
+            <input
+              type="range"
+              min={400}
+              max={3000}
+              step={200}
+              value={aiSpeed}
+              onChange={e => setAiSpeed(Number(e.target.value))}
+              className="setup-slider"
+            />
+            <span className="setup-slider-label">Slow</span>
+          </div>
+        </div>
+
+        <div className="setup-field setup-field-row">
+          <label>Debug Mode (show AI tiles)</label>
+          <div
+            className={`setup-toggle ${debugMode ? 'active' : ''}`}
+            onClick={() => setDebugMode(d => !d)}
+          >
+            <div className="setup-toggle-knob" />
+          </div>
+        </div>
+
+        <button className="setup-start-btn" onClick={handleStart}>
+          Start Game
+        </button>
       </div>
     </div>
   );
