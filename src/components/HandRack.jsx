@@ -24,6 +24,7 @@ export default function HandRack({
           selected={selectedIds?.has(tile.id)}
           draggable={isCurrentPlayer && !hidden}
           small={small}
+          source="hand"
           onClick={() => isCurrentPlayer && !hidden && onSelect?.(tile)}
           onDragStart={e => {
             e.dataTransfer.setData('tileId', String(tile.id));

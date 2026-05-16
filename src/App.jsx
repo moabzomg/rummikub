@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Setup from './components/Setup';
 import Game from './components/Game';
+import { DragProvider } from './components/DragContext';
 import './styles/main.css';
 
 export default function App() {
@@ -9,9 +10,12 @@ export default function App() {
   const handleStart = (cfg) => setConfig(cfg);
   const handleBackToMenu = () => setConfig(null);
 
-  if (!config) {
-    return <Setup onStart={handleStart} />;
-  }
-
-  return <Game key={JSON.stringify(config)} config={config} onBackToMenu={handleBackToMenu} />;
+  return (
+    <DragProvider>
+      {!config
+        ? <Setup onStart={handleStart} />
+        : <Game key={JSON.stringify(config)} config={config} onBackToMenu={handleBackToMenu} />
+      }
+    </DragProvider>
+  );
 }

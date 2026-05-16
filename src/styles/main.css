@@ -419,7 +419,7 @@ body {
 .board-sets {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 18px;
   align-content: flex-start;
   min-height: 200px;
 }
@@ -428,7 +428,7 @@ body {
   display: flex;
   flex-wrap: nowrap;
   gap: 3px;
-  padding: 6px;
+  padding: 6px 8px;
   border-radius: 10px;
   border: 2px dashed var(--board-set-border);
   background: rgba(255,255,255,0.03);
@@ -436,6 +436,8 @@ body {
   min-width: 60px;
   min-height: 56px;
   align-items: center;
+  /* Clear visual break between sets */
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
 }
 
 .board-set.set-valid {
