@@ -13,6 +13,7 @@ export default function Tile({
   tile,
   hidden = false,
   selected = false,
+  isNew = false,
   draggable = false,
   onDragStart,   // kept for HTML5 compat
   onClick,
@@ -66,7 +67,7 @@ export default function Tile({
 
   return (
     <div
-      className={`${sizeClass} ${selected ? 'tile-selected' : ''} ${draggable ? 'tile-draggable' : ''}`}
+      className={`${sizeClass} ${selected ? 'tile-selected' : ''} ${isNew ? 'tile-new' : ''} ${draggable ? 'tile-draggable' : ''}`}
       style={{ ...colorStyle, ...style, touchAction: draggable ? 'none' : 'auto' }}
       draggable={draggable}
       onDragStart={onDragStart}

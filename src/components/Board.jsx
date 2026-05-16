@@ -6,6 +6,7 @@ import { useDrag } from './DragContext';
 export default function Board({
   sets,
   selectedIds,
+  newlyPlayedIds,
   onTileClick,
   onDropToSet,
   onDropToNew,
@@ -86,6 +87,7 @@ export default function Board({
                   key={tile.id}
                   tile={tile}
                   selected={selectedIds?.has(tile.id)}
+                  isNew={newlyPlayedIds?.has(tile.id)}
                   draggable={isInteractive}
                   source="board"
                   sourceSetIdx={setIdx}

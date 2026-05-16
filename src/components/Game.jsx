@@ -34,6 +34,7 @@ export default function Game({ config, onBackToMenu }) {
   const [roundScores, setRoundScores] = useState(null);
   const [sortByColor, setSortByColor] = useState(true);
   const [debugMode, setDebugMode] = useState(config.debugMode);
+  const [newlyPlayedIds, setNewlyPlayedIds] = useState(new Set()); // tiles just placed by AI
   const aiTimerRef = useRef(null);
 
   const isHumanTurn = state.currentPlayer === 0 && state.phase === 'playing';
@@ -332,6 +333,11 @@ export default function Game({ config, onBackToMenu }) {
             return { ...p, hand: result.newHand, hasMelded: true };
           });
 
+          // Mark the newly placed tile IDs so Board can animate them in
+          const playedIds = new Set(result.tilesPlayed.map(t => t.id));
+          setNewlyPlayedIds(playedIds);
+          setTimeout(() => setNewlyPlayedIds(new Set()), 800);
+
           if (won) {
             const handValues = newPlayers.map((p, i) =>
               i === prev.currentPlayer ? 0 : calculateHandValue(p.hand)
@@ -495,6 +501,7 @@ export default function Game({ config, onBackToMenu }) {
           <Board
             sets={currentBoard}
             selectedIds={selectedIds}
+            newlyPlayedIds={newlyPlayedIds}
             isInteractive={isHumanTurn}
             onTileClick={handleBoardTileClick}
             onDropToSet={handleDropToSet}
