@@ -314,6 +314,27 @@ export default function Game({ config, onBackToMenu }) {
     setSelectedIds(new Set());
   }, []);
 
+  // Drag entire group from board back to hand
+  const handleDropGroupToHand = useCallback((tiles, source, sourceSetIdx) => {
+    if (source !== 'board') return;
+    // Pre-meld: check none of the group tiles are original board tiles
+    if (!state.players[0].hasMelded) {
+      const originalBoardTileIds = new Set(state.board.flat().map(t => t.id));
+      if (tiles.some(t => originalBoardTileIds.has(t.id))) {
+        addLog('❌ You cannot touch board tiles before your initial meld!');
+        return;
+      }
+    }
+    initWorkingState();
+    const tileIds = new Set(tiles.map(t => t.id));
+    const newBoard = (workingBoard || state.board.map(s => [...s]))
+      .map(s => s.filter(t => !tileIds.has(t.id)))
+      .filter(s => s.length > 0);
+    const newHand = [...(workingHand || state.players[0].hand), ...tiles];
+    setWorkingBoard(newBoard);
+    setWorkingHand(newHand);
+  }, [initWorkingState, workingBoard, workingHand, state.board, state.players, addLog]);
+
   // ── AI Turn ───────────────────────────────────────────────
   useEffect(() => {
     if (state.phase !== 'playing') return;
@@ -517,7 +538,7 @@ export default function Game({ config, onBackToMenu }) {
             onTileClick={handleBoardTileClick}
             onDropToSet={handleDropToSet}
             onDropToNew={handleDropToNew}
-            onDragStartBoardTile={() => {}}
+            onDropGroupToHand={handleDropGroupToHand}
           />
         </div>
 
@@ -595,10 +616,10 @@ export default function Game({ config, onBackToMenu }) {
           hand={workingHand || human?.hand || []}
           selectedIds={selectedIds}
           onSelect={handleTileSelect}
-          onDragStart={() => {}}
           isCurrentPlayer={isHumanTurn}
           hidden={false}
           sortByColor={sortByColor}
+          onDropToHand={handleDropGroupToHand}
         />
       </div>
 

@@ -3,84 +3,99 @@ import { useDrag } from './DragContext';
 
 const COLOR_STYLES = {
   black: { color: '#1a1a1a' },
-  blue: { color: '#1565c0' },
-  orange: { color: '#e65100' },
-  red: { color: '#c62828' },
+  blue:  { color: '#1565c0' },
+  orange:{ color: '#e65100' },
+  red:   { color: '#c62828' },
   joker: { color: '#8e24aa' },
 };
 
+// DRAG_THRESHOLD: pixels moved before drag starts (not a tap)
+const DRAG_THRESHOLD = 6;
+
 export default function Tile({
   tile,
-  hidden = false,
-  selected = false,
-  isNew = false,
-  draggable = false,
-  onDragStart,   // kept for HTML5 compat
+  hidden     = false,
+  selected   = false,
+  isNew      = false,
+  draggable  = false,
   onClick,
-  small = false,
-  style = {},
-  source = 'hand',
+  small      = false,
+  style      = {},
+  source     = 'hand',
   sourceSetIdx,
+  // Optional: if provided, dragging this tile will drag the whole group
+  groupTiles,
 }) {
   const dragCtx = useDrag();
-  const pointerDownPos = useRef(null);
-  const isDragging = useRef(false);
+  const downPos  = useRef(null);
+  const dragging = useRef(false);
 
   if (!tile) return null;
 
   const sizeClass = small ? 'tile tile-small' : 'tile';
 
-  if (hidden) {
-    return <div className={`${sizeClass} tile-hidden`} style={style} />;
-  }
+  if (hidden) return <div className={`${sizeClass} tile-hidden`} style={style} />;
 
   const colorStyle = COLOR_STYLES[tile.color] || COLOR_STYLES.black;
 
   const handlePointerDown = (e) => {
     if (!draggable) return;
-    pointerDownPos.current = { x: e.clientX, y: e.clientY };
-    isDragging.current = false;
+    e.stopPropagation();
+    downPos.current  = { x: e.clientX, y: e.clientY };
+    dragging.current = false;
+    // Capture so we get move/up even if pointer leaves tile
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e) => {
-    if (!draggable || !pointerDownPos.current) return;
-    const dx = e.clientX - pointerDownPos.current.x;
-    const dy = e.clientY - pointerDownPos.current.y;
-    if (!isDragging.current && Math.sqrt(dx*dx + dy*dy) > 6) {
-      isDragging.current = true;
-      e.target.releasePointerCapture?.(e.pointerId);
-      dragCtx?.startDrag(tile, source, sourceSetIdx, e.clientX, e.clientY);
+    if (!draggable || !downPos.current || dragging.current) return;
+    const dx = e.clientX - downPos.current.x;
+    const dy = e.clientY - downPos.current.y;
+    if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+      dragging.current = true;
+      // Release capture so pointer events reach underlying elements (drop zones)
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      const tiles = groupTiles || [tile];
+      dragCtx?.startDrag(tiles, source, sourceSetIdx, e.clientX, e.clientY);
     }
   };
 
-  const handlePointerUp = () => {
-    if (!isDragging.current && pointerDownPos.current) {
-      // It was a tap/click, not a drag
+  const handlePointerUp = (e) => {
+    if (!dragging.current) {
+      onClick?.(e);
     }
-    pointerDownPos.current = null;
-    isDragging.current = false;
+    downPos.current  = null;
+    dragging.current = false;
   };
 
-  const handleClick = (e) => {
-    if (!isDragging.current) onClick?.(e);
+  const handlePointerCancel = () => {
+    downPos.current  = null;
+    dragging.current = false;
   };
+
+  // Hide the original tile while it's being dragged as ghost
+  const isBeingDragged = dragCtx?.drag?.tiles?.some(t => t.id === tile.id);
 
   return (
     <div
       className={`${sizeClass} ${selected ? 'tile-selected' : ''} ${isNew ? 'tile-new' : ''} ${draggable ? 'tile-draggable' : ''}`}
-      style={{ ...colorStyle, ...style, touchAction: draggable ? 'none' : 'auto' }}
-      draggable={draggable}
-      onDragStart={onDragStart}
+      style={{
+        ...colorStyle,
+        ...style,
+        touchAction: draggable ? 'none' : 'auto',
+        // Fade source tile(s) while dragging — don't fully hide so layout stays stable
+        opacity: isBeingDragged ? 0.25 : 1,
+        transition: 'opacity 0.1s',
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onClick={handleClick}
+      onPointerCancel={handlePointerCancel}
     >
-      {tile.isJoker ? (
-        <span className="tile-joker-icon">☺</span>
-      ) : (
-        <span className="tile-number">{tile.number}</span>
-      )}
+      {tile.isJoker
+        ? <span className="tile-joker-icon">☺</span>
+        : <span className="tile-number">{tile.number}</span>
+      }
     </div>
   );
 }

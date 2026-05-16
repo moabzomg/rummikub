@@ -767,6 +767,12 @@ body {
   flex-wrap: wrap;
   gap: 4px;
   min-height: 56px;
+  align-items: center;
+}
+
+.hand-rack-gap {
+  width: 14px;
+  flex-shrink: 0;
 }
 
 .hand-rack-small {
